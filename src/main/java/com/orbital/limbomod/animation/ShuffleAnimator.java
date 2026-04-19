@@ -22,7 +22,7 @@ public class ShuffleAnimator {
 
     // ── Configuration ─────────────────────────────────────────────────────────
     public  static final int   SLOT_COUNT        = 8;
-    private static final int   SWAP_TICKS        = 14;   // ticks for one smooth swap
+    private static final int   SWAP_TICKS        = 8;   // ticks for one smooth swap
     private static final int   INTRO_SCALE_TICKS = 22;   // ticks to scale up at center
     private static final int   INTRO_SPLIT_TICKS = 28;   // ticks to spread to grid
     private static final int   FLASH_TICKS       = 48;   // ticks for the green pulses

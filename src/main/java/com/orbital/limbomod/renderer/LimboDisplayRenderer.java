@@ -66,9 +66,14 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
                 true, // sort on upload (translucent)
                 RenderType.CompositeState.builder()
                         .setShaderState(new RenderType.ShaderStateShard(GameRenderer::getPositionColorShader))
-                        .setTransparencyState(RenderType.TRANSLUCENT_TRANSPARENCY)
-                        .setDepthTestState(RenderType.NO_DEPTH_TEST)
-                        .setWriteMaskState(RenderType.COLOR_WRITE)
+                        .setTransparencyState(new RenderType.TransparencyStateShard("translucent_transparency", () -> {
+                            RenderSystem.enableBlend();
+                            RenderSystem.defaultBlendFunc();
+                        }, () -> {
+                            RenderSystem.disableBlend();
+                        }))
+                        .setDepthTestState(new RenderType.DepthTestStateShard("always", 519))
+                        .setWriteMaskState(new RenderType.WriteMaskStateShard(true, true))
                         .createCompositeState(false));
     }
 
