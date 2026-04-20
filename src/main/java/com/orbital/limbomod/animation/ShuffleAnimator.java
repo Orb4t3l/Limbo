@@ -1,13 +1,11 @@
 package com.orbital.limbomod.animation;
 
-import com.orbital.limbomod.animation.AnimPhase;
-
 import java.util.Random;
 
 public class ShuffleAnimator {
 
     public  static final int   SLOT_COUNT        = 8;
-    private static final int   SWAP_TICKS        = 16;
+    private static final int   SWAP_TICKS        = 9;
     private static final int   INTRO_SCALE_TICKS = 22;
     private static final int   INTRO_SPLIT_TICKS = 28;
     private static final int   FLASH_TICKS       = 80;
@@ -19,7 +17,6 @@ public class ShuffleAnimator {
 
     public final SlotState[] slots = new SlotState[SLOT_COUNT];
 
-    // Fixed identity — never changes. Item at this index IS the correct one.
     private final int correctVisualSlot;
 
     public float groupRotation = 0f;
@@ -31,11 +28,11 @@ public class ShuffleAnimator {
     private AnimPhase phase = AnimPhase.INTRO;
     private int timer = 0;
 
-    private boolean swapping    = false;
-    private int     swapTimer   = 0;
-    private int     swapsLeft   = 0;
+    private boolean swapping  = false;
+    private int     swapTimer = 0;
+    private int     swapsLeft = 0;
 
-    private int  clickedSlot     = -1;
+    private int     clickedSlot     = -1;
     public  boolean resultIsCorrect = false;
     public  boolean isDone          = false;
 
@@ -64,13 +61,13 @@ public class ShuffleAnimator {
     public void tick() {
         timer++;
         switch (phase) {
-            case INTRO          -> tickIntro();
-            case FLASH_CORRECT  -> tickFlashCorrect();
+            case INTRO                                   -> tickIntro();
+            case FLASH_CORRECT                           -> tickFlashCorrect();
             case SWAP_1, SWAP_2, SWAP_3, SWAP_4, SWAP_5 -> tickSwaps();
             case ROTATE_360, ROTATE_180, ROTATE_90, ROTATE_90_FINAL -> tickRotation();
-            case WAITING        -> tickWaiting();
-            case RESULT_FLASH   -> tickResultFlash();
-            case DONE           -> isDone = true;
+            case WAITING                                 -> tickWaiting();
+            case RESULT_FLASH                            -> tickResultFlash();
+            case DONE                                    -> isDone = true;
         }
     }
 
@@ -97,26 +94,22 @@ public class ShuffleAnimator {
     }
 
     private void tickFlashCorrect() {
-        float t = timer / (float) FLASH_TICKS;
-        // Three pulses; also scale the correct slot up slightly so it's unmistakable
+        float t    = timer / (float) FLASH_TICKS;
         float glow = (float) Math.pow(Math.sin(t * Math.PI * 3), 2);
         glow = Math.max(0f, glow);
         slots[correctVisualSlot].glowGreenAlpha = glow;
-        slots[correctVisualSlot].scale = 1f + glow * 0.25f;
+        slots[correctVisualSlot].scale          = 1f + glow * 0.25f;
 
         if (timer >= FLASH_TICKS) {
             slots[correctVisualSlot].glowGreenAlpha = 0f;
-            slots[correctVisualSlot].scale = 1f;
+            slots[correctVisualSlot].scale          = 1f;
             enterSwapPhase(AnimPhase.SWAP_1, 6);
         }
     }
 
     private void tickSwaps() {
         if (!swapping) {
-            if (swapsLeft <= 0) {
-                advanceFromSwapPhase();
-                return;
-            }
+            if (swapsLeft <= 0) { advanceFromSwapPhase(); return; }
             swapsLeft--;
             beginMassSwap();
         }
@@ -137,19 +130,14 @@ public class ShuffleAnimator {
         }
     }
 
+    /
     private void beginMassSwap() {
         int[] perm = {0, 1, 2, 3, 4, 5, 6, 7};
-        for (int i = 7; i > 0; i--) {
-            int j = rng.nextInt(i + 1);
+        for (int i = SLOT_COUNT - 1; i > 0; i--) {
+            int j = rng.nextInt(i);
             int tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
         }
-        // Push any fixed points to their neighbor so every item moves
-        for (int i = 0; i < SLOT_COUNT; i++) {
-            if (perm[i] == i) {
-                int next = (i + 1) % SLOT_COUNT;
-                int tmp = perm[i]; perm[i] = perm[next]; perm[next] = tmp;
-            }
-        }
+
         for (int i = 0; i < SLOT_COUNT; i++) {
             slots[i].startX  = slots[i].x;
             slots[i].startY  = slots[i].y;
@@ -162,10 +150,10 @@ public class ShuffleAnimator {
 
     private void advanceFromSwapPhase() {
         switch (phase) {
-            case SWAP_1 -> enterRotationPhase(AnimPhase.ROTATE_360,      360f, 60);
-            case SWAP_2 -> enterRotationPhase(AnimPhase.ROTATE_180,      180f, 42);
-            case SWAP_3 -> enterRotationPhase(AnimPhase.ROTATE_90,        90f, 28);
-            case SWAP_4 -> enterRotationPhase(AnimPhase.ROTATE_90_FINAL,  90f, 28);
+            case SWAP_1 -> enterRotationPhase(AnimPhase.ROTATE_360,     360f, 18);
+            case SWAP_2 -> enterRotationPhase(AnimPhase.ROTATE_180,     180f, 12);
+            case SWAP_3 -> enterRotationPhase(AnimPhase.ROTATE_90,       90f, 8);
+            case SWAP_4 -> enterRotationPhase(AnimPhase.ROTATE_90_FINAL, 90f, 8);
             case SWAP_5 -> enterPhase(AnimPhase.WAITING);
             default     -> {}
         }
@@ -193,19 +181,16 @@ public class ShuffleAnimator {
 
     private void doInstantMassShuffle() {
         int[] perm = {0, 1, 2, 3, 4, 5, 6, 7};
-        for (int i = 7; i > 0; i--) {
-            int j = rng.nextInt(i + 1);
+        for (int i = SLOT_COUNT - 1; i > 0; i--) {
+            int j = rng.nextInt(i);
             int tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
         }
-        float[] newX = new float[SLOT_COUNT];
-        float[] newY = new float[SLOT_COUNT];
+        float[] nx = new float[SLOT_COUNT];
+        float[] ny = new float[SLOT_COUNT];
+        for (int i = 0; i < SLOT_COUNT; i++) { nx[i] = gridX[perm[i]]; ny[i] = gridY[perm[i]]; }
         for (int i = 0; i < SLOT_COUNT; i++) {
-            newX[i] = gridX[perm[i]];
-            newY[i] = gridY[perm[i]];
-        }
-        for (int i = 0; i < SLOT_COUNT; i++) {
-            slots[i].x = slots[i].startX = slots[i].targetX = newX[i];
-            slots[i].y = slots[i].startY = slots[i].targetY = newY[i];
+            slots[i].x = slots[i].startX = slots[i].targetX = nx[i];
+            slots[i].y = slots[i].startY = slots[i].targetY = ny[i];
         }
     }
 
@@ -216,9 +201,8 @@ public class ShuffleAnimator {
 
     private void tickResultFlash() {
         float alpha = Math.max(0f, 1f - timer / 18f);
-        if (clickedSlot >= 0 && clickedSlot < SLOT_COUNT) {
+        if (clickedSlot >= 0 && clickedSlot < SLOT_COUNT)
             slots[clickedSlot].flashRedAlpha = alpha;
-        }
         if (timer >= 18) enterPhase(AnimPhase.DONE);
     }
 
@@ -229,20 +213,9 @@ public class ShuffleAnimator {
         enterPhase(AnimPhase.RESULT_FLASH);
     }
 
-    private void enterPhase(AnimPhase next) { phase = next; timer = 0; }
-
-    private void enterSwapPhase(AnimPhase swapPhase, int count) {
-        enterPhase(swapPhase);
-        swapsLeft = count;
-        swapping  = false;
-    }
-
-    private void enterRotationPhase(AnimPhase rotPhase, float degrees, int durationTicks) {
-        enterPhase(rotPhase);
-        rotStart    = groupRotation;
-        rotTarget   = groupRotation + degrees;
-        rotDuration = durationTicks;
-    }
+    private void enterPhase(AnimPhase next)                            { phase = next; timer = 0; }
+    private void enterSwapPhase(AnimPhase p, int count)                { enterPhase(p); swapsLeft = count; swapping = false; }
+    private void enterRotationPhase(AnimPhase p, float deg, int ticks) { enterPhase(p); rotStart = groupRotation; rotTarget = groupRotation + deg; rotDuration = ticks; }
 
     private static float lerp(float a, float b, float t)  { return a + (b - a) * t; }
     private static float easeOutCubic(float t)             { float f = 1f - t; return 1f - f*f*f; }
