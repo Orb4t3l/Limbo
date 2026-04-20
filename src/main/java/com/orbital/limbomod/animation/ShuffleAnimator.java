@@ -130,20 +130,31 @@ public class ShuffleAnimator {
         }
     }
 
-    /
     private void beginMassSwap() {
+        // Snapshot where every slot actually is right now
+        float[] curX = new float[SLOT_COUNT];
+        float[] curY = new float[SLOT_COUNT];
+        for (int i = 0; i < SLOT_COUNT; i++) {
+            curX[i] = slots[i].x;
+            curY[i] = slots[i].y;
+        }
+
+        // Sattolo on indices 0-7: guarantees perm[i] != i, so no slot
+        // can be assigned its own current position as a target
         int[] perm = {0, 1, 2, 3, 4, 5, 6, 7};
         for (int i = SLOT_COUNT - 1; i > 0; i--) {
-            int j = rng.nextInt(i);
+            int j = rng.nextInt(i); // nextInt(i) not (i+1) — Sattolo
             int tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
         }
 
+        // Slot i travels to wherever slot perm[i] currently sits
         for (int i = 0; i < SLOT_COUNT; i++) {
             slots[i].startX  = slots[i].x;
             slots[i].startY  = slots[i].y;
-            slots[i].targetX = gridX[perm[i]];
-            slots[i].targetY = gridY[perm[i]];
+            slots[i].targetX = curX[perm[i]];
+            slots[i].targetY = curY[perm[i]];
         }
+
         swapTimer = 0;
         swapping  = true;
     }
@@ -180,17 +191,24 @@ public class ShuffleAnimator {
     }
 
     private void doInstantMassShuffle() {
+        float[] curX = new float[SLOT_COUNT];
+        float[] curY = new float[SLOT_COUNT];
+        for (int i = 0; i < SLOT_COUNT; i++) {
+            curX[i] = slots[i].x;
+            curY[i] = slots[i].y;
+        }
+
         int[] perm = {0, 1, 2, 3, 4, 5, 6, 7};
         for (int i = SLOT_COUNT - 1; i > 0; i--) {
             int j = rng.nextInt(i);
             int tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
         }
-        float[] nx = new float[SLOT_COUNT];
-        float[] ny = new float[SLOT_COUNT];
-        for (int i = 0; i < SLOT_COUNT; i++) { nx[i] = gridX[perm[i]]; ny[i] = gridY[perm[i]]; }
+
         for (int i = 0; i < SLOT_COUNT; i++) {
-            slots[i].x = slots[i].startX = slots[i].targetX = nx[i];
-            slots[i].y = slots[i].startY = slots[i].targetY = ny[i];
+            float nx = curX[perm[i]];
+            float ny = curY[perm[i]];
+            slots[i].x = slots[i].startX = slots[i].targetX = nx;
+            slots[i].y = slots[i].startY = slots[i].targetY = ny;
         }
     }
 
