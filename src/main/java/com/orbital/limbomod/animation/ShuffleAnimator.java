@@ -5,10 +5,10 @@ import java.util.Random;
 public class ShuffleAnimator {
 
     public  static final int   SLOT_COUNT        = 8;
-    private static final int   SWAP_TICKS        = 9;
-    private static final int   INTRO_SCALE_TICKS = 22;
-    private static final int   INTRO_SPLIT_TICKS = 28;
-    private static final int   FLASH_TICKS       = 80;
+    private static final int   SWAP_TICKS        = 6;
+    private static final int   INTRO_SCALE_TICKS = 10;
+    private static final int   INTRO_SPLIT_TICKS = 12;
+    private static final int   FLASH_TICKS       = 26;
     private static final float SPACING_X         = 0.55f;
     private static final float SPACING_Y         = 0.55f;
 
@@ -95,7 +95,7 @@ public class ShuffleAnimator {
 
     private void tickFlashCorrect() {
         float t    = timer / (float) FLASH_TICKS;
-        float glow = (float) Math.pow(Math.sin(t * Math.PI * 3), 2);
+        float glow = (float) Math.pow(Math.sin(t * Math.PI * 2), 2); // 2 pulses
         glow = Math.max(0f, glow);
         slots[correctVisualSlot].glowGreenAlpha = glow;
         slots[correctVisualSlot].scale          = 1f + glow * 0.25f;

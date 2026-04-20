@@ -1,0 +1,10 @@
+{
+  "limbo_music": {
+    "sounds": [
+      {
+        "name": "limbomod:limbo_music",
+        "stream": true
+      }
+    ]
+  }
+}

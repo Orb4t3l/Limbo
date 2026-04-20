@@ -24,17 +24,14 @@ public class LimboMod {
     public LimboMod() {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        // Register entity types
         LimboEntities.ENTITIES.register(modBus);
+        LimboSounds.SOUNDS.register(modBus);
 
-        // Common + client lifecycle
         modBus.addListener(this::commonSetup);
         modBus.addListener(this::clientSetup);
 
-        // Forge event bus — server-side game events
         MinecraftForge.EVENT_BUS.register(new BlockBreakHandler());
 
-        // Client-side game events (registered only on the client dist)
         if (FMLEnvironment.dist == Dist.CLIENT) {
             MinecraftForge.EVENT_BUS.register(new ClientClickHandler());
         }
