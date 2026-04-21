@@ -19,16 +19,19 @@ import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockBreakHandler {
 
     private static final int MAX_DISPLAYS = 10;
 
-    private final Set<String> managedPositions = new HashSet<>();
+    private final Set<String>         managedPositions = new HashSet<>();
+    private final Map<String, Float>  positionYaw      = new HashMap<>();
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockEvent.BreakEvent event) {
@@ -45,7 +48,10 @@ public class BlockBreakHandler {
         List<ItemStack> previewDrops = Block.getDrops(state, serverLevel, pos, be, player, tool);
         if (previewDrops.isEmpty()) return;
 
-        managedPositions.add(posKey(serverLevel, pos));
+        String key = posKey(serverLevel, pos);
+        managedPositions.add(key);
+        // Store player yaw so the display faces toward them
+        positionYaw.put(key, player.getYRot());
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -55,22 +61,23 @@ public class BlockBreakHandler {
 
         Level    level = event.getLevel();
         BlockPos pos   = BlockPos.containing(itemEntity.position());
+        String   key   = posKey(level, pos);
 
-        if (!managedPositions.contains(posKey(level, pos))) return;
-
+        if (!managedPositions.contains(key)) return;
         event.setCanceled(true);
 
         ItemStack drop = itemEntity.getItem().copy();
         if (drop.isEmpty()) return;
 
-        // Enforce cap — count existing displays in this level
         long existing = ((ServerLevel) level)
                 .getEntities(LimboEntities.LIMBO_DISPLAY.get(), e -> true)
                 .size();
         if (existing >= MAX_DISPLAYS) return;
 
-        long seed = ThreadLocalRandom.current().nextLong();
-        LimboDisplayEntity display = new LimboDisplayEntity(level, drop, seed);
+        float yaw  = positionYaw.getOrDefault(key, 0f);
+        long  seed = ThreadLocalRandom.current().nextLong();
+
+        LimboDisplayEntity display = new LimboDisplayEntity(level, drop, seed, yaw);
         display.setPos(pos.getX() + 0.5, pos.getY() + 1.5, pos.getZ() + 0.5);
         ((ServerLevel) level).addFreshEntity(display);
 
@@ -80,8 +87,10 @@ public class BlockBreakHandler {
 
     @SubscribeEvent
     public void onLevelTickEnd(TickEvent.LevelTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && !event.level.isClientSide())
+        if (event.phase == TickEvent.Phase.END && !event.level.isClientSide()) {
             managedPositions.clear();
+            positionYaw.clear();
+        }
     }
 
     private static String posKey(Level level, BlockPos pos) {

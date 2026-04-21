@@ -24,6 +24,8 @@ public class LimboDisplayEntity extends Entity {
             SynchedEntityData.defineId(LimboDisplayEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<Long> DATA_SEED =
             SynchedEntityData.defineId(LimboDisplayEntity.class, EntityDataSerializers.LONG);
+    private static final EntityDataAccessor<Float> DATA_FACING_YAW =
+            SynchedEntityData.defineId(LimboDisplayEntity.class, EntityDataSerializers.FLOAT);
 
     private ShuffleAnimator animator;
     private ItemStack        displayItem   = ItemStack.EMPTY;
@@ -36,11 +38,12 @@ public class LimboDisplayEntity extends Entity {
         this.setNoGravity(true);
     }
 
-    public LimboDisplayEntity(Level level, ItemStack item, long seed) {
+    public LimboDisplayEntity(Level level, ItemStack item, long seed, float facingYaw) {
         this(LimboEntities.LIMBO_DISPLAY.get(), level);
         this.displayItem = item.copy();
         this.entityData.set(DATA_ITEM, item.copy());
         this.entityData.set(DATA_SEED, seed);
+        this.entityData.set(DATA_FACING_YAW, facingYaw);
         initAnimator(seed);
     }
 
@@ -48,6 +51,7 @@ public class LimboDisplayEntity extends Entity {
     protected void defineSynchedData() {
         entityData.define(DATA_ITEM, ItemStack.EMPTY);
         entityData.define(DATA_SEED, 0L);
+        entityData.define(DATA_FACING_YAW, 0f);
     }
 
     @Override
@@ -72,13 +76,8 @@ public class LimboDisplayEntity extends Entity {
     public void tick() {
         super.tick();
         if (!initialized) return;
-
         lifetimeTicks++;
-        if (lifetimeTicks >= MAX_LIFETIME) {
-            this.discard();
-            return;
-        }
-
+        if (lifetimeTicks >= MAX_LIFETIME) { this.discard(); return; }
         animator.tick();
         if (animator.isDone) this.discard();
     }
@@ -96,9 +95,10 @@ public class LimboDisplayEntity extends Entity {
         }
     }
 
-    public ShuffleAnimator getAnimator()    { return animator;    }
-    public ItemStack       getDisplayItem() { return displayItem; }
-    public boolean         isInitialized()  { return initialized; }
+    public float           getFacingYaw()  { return entityData.get(DATA_FACING_YAW); }
+    public ShuffleAnimator getAnimator()   { return animator;    }
+    public ItemStack       getDisplayItem(){ return displayItem; }
+    public boolean         isInitialized() { return initialized; }
 
     @Override
     protected void readAdditionalSaveData(CompoundTag tag) {
@@ -108,6 +108,7 @@ public class LimboDisplayEntity extends Entity {
         }
         long seed = tag.getLong("AnimSeed");
         entityData.set(DATA_SEED, seed);
+        entityData.set(DATA_FACING_YAW, tag.getFloat("FacingYaw"));
         if (seed != 0L && !displayItem.isEmpty()) initAnimator(seed);
     }
 
@@ -119,6 +120,7 @@ public class LimboDisplayEntity extends Entity {
             tag.put("DisplayItem", itemTag);
         }
         tag.putLong("AnimSeed", entityData.get(DATA_SEED));
+        tag.putFloat("FacingYaw", entityData.get(DATA_FACING_YAW));
     }
 
     @Override

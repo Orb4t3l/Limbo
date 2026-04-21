@@ -17,6 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -26,12 +27,10 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
     private static final ResourceLocation EMPTY_TEXTURE =
             new ResourceLocation("limbomod", "textures/entity/empty.png");
 
-    private static final float HIT_RADIUS     = 0.28f;
-    private static final float ITEM_SCALE     = 0.45f;
-    // How far the border sits from the item center (just outside the item)
-    private static final float BORDER_INNER   = 0.26f;
-    // Thickness of each border bar
-    private static final float BORDER_THICK   = 0.045f;
+    private static final float HIT_RADIUS   = 0.28f;
+    private static final float ITEM_SCALE   = 0.45f;
+    // Where the outline square sits — just outside the item's visual edge
+    private static final float OUTLINE_HALF = 0.30f;
 
     public LimboDisplayRenderer(EntityRendererProvider.Context ctx) { super(ctx); }
 
@@ -51,43 +50,15 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
         updateHover(entity, anim, camera);
 
         pose.pushPose();
-        pose.mulPose(camera.rotation());
+
+        // Fixed orientation — rotate around Y to face the direction the player
+        // was looking when the block was broken. Does not track the camera.
+        pose.mulPose(Axis.YP.rotationDegrees(-(entity.getFacingYaw() + 180f)));
+
+        // Group rotation around Z (the forward axis) for the shuffle spin phases
         pose.mulPose(Axis.ZP.rotationDegrees(-anim.groupRotation));
 
-        VertexConsumer outlineVerts = buffers.getBuffer(RenderType.debugFilledBox());
-
-        // Pass 1: border outlines behind items
-        for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
-            SlotState slot  = anim.slots[i];
-            float     zOff  = -0.02f + i * 0.001f; // slightly behind item layer
-
-            boolean needsBorder = slot.glowGreenAlpha > 0.001f
-                    || slot.flashRedAlpha  > 0.001f
-                    || slot.hoverAlpha     > 0.001f;
-            if (!needsBorder) continue;
-
-            pose.pushPose();
-            pose.translate(slot.x, slot.y, zOff);
-
-            // Scale border with the slot so it tracks during intro/waiting pulse
-            float bs = slot.scale;
-            Matrix4f m = pose.last().pose();
-
-            if (slot.glowGreenAlpha > 0.001f)
-                addBorder(outlineVerts, m, bs, 0.10f, 1.00f, 0.20f, slot.glowGreenAlpha);
-            if (slot.flashRedAlpha > 0.001f)
-                addBorder(outlineVerts, m, bs, 1.00f, 0.10f, 0.10f, slot.flashRedAlpha);
-            if (slot.hoverAlpha > 0.001f)
-                addBorder(outlineVerts, m, bs, 1.00f, 1.00f, 1.00f, slot.hoverAlpha * 0.6f);
-
-            pose.popPose();
-        }
-
-        // Flush outlines before items so items sit cleanly on top
-        if (buffers instanceof MultiBufferSource.BufferSource bs)
-            bs.endBatch(RenderType.debugFilledBox());
-
-        // Pass 2: items
+        // Pass 1: items
         for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
             SlotState slot = anim.slots[i];
             pose.pushPose();
@@ -100,38 +71,73 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
             pose.popPose();
         }
 
+        // Flush items before drawing outlines on top
+        if (buffers instanceof MultiBufferSource.BufferSource bs) bs.endBatch();
+
+        // Pass 2: outlines using RenderType.lines() — no winding order issues,
+        // and naturally renders in front of items since we flush first.
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
+            SlotState slot = anim.slots[i];
+
+            boolean needsOutline = slot.glowGreenAlpha > 0.001f
+                    || slot.flashRedAlpha  > 0.001f
+                    || slot.hoverAlpha     > 0.001f;
+            if (!needsOutline) continue;
+
+            pose.pushPose();
+            // Sit the outline slightly in front of the item layer
+            pose.translate(slot.x, slot.y, 0.04f + i * 0.001f);
+
+            float   sz = OUTLINE_HALF * slot.scale;
+            Matrix4f m  = pose.last().pose();
+            Matrix3f nm = pose.last().normal();
+
+            if (slot.glowGreenAlpha > 0.001f)
+                addOutlineRect(lines, m, nm, sz, 0.10f, 1.00f, 0.20f, slot.glowGreenAlpha);
+            if (slot.flashRedAlpha > 0.001f)
+                addOutlineRect(lines, m, nm, sz, 1.00f, 0.10f, 0.10f, slot.flashRedAlpha);
+            if (slot.hoverAlpha > 0.001f)
+                addOutlineRect(lines, m, nm, sz, 1.00f, 1.00f, 1.00f, slot.hoverAlpha * 0.7f);
+
+            pose.popPose();
+        }
+
+        // Flush lines
+        if (buffers instanceof MultiBufferSource.BufferSource bs)
+            bs.endBatch(RenderType.lines());
+
         pose.popPose();
         super.render(entity, yaw, partialTick, pose, buffers, light);
     }
 
     /**
-     * Draws 4 thin rectangles forming a square border frame around the slot.
-     * Each bar goes: bottom, top, left, right.
-     * The frame sits just outside BORDER_INNER, with thickness BORDER_THICK.
-     * Everything is scaled by `scale` so it matches the item's current size.
+     * Draws a square outline (4 line segments) centred at the current pose origin.
+     * Uses RenderType.lines() which requires POSITION_COLOR_NORMAL vertices.
+     * We draw each edge 3 times at slightly different sizes so it reads as a
+     * thick border rather than a hairline — this mimics how the vanilla glow
+     * outline looks at distance.
      */
-    private static void addBorder(VertexConsumer vc, Matrix4f m, float scale,
-                                  float r, float g, float b, float a) {
-        float inner = BORDER_INNER * scale;
-        float outer = inner + BORDER_THICK * scale;
-
-        // Bottom
-        addRect(vc, m, -outer, -outer,  outer, -inner, r, g, b, a);
-        // Top
-        addRect(vc, m, -outer,  inner,  outer,  outer, r, g, b, a);
-        // Left
-        addRect(vc, m, -outer, -inner, -inner,  inner, r, g, b, a);
-        // Right
-        addRect(vc, m,  inner, -inner,  outer,  inner, r, g, b, a);
+    private static void addOutlineRect(VertexConsumer vc, Matrix4f m, Matrix3f nm,
+                                       float half, float r, float g, float b, float a) {
+        for (int pass = 0; pass < 3; pass++) {
+            float h = half + pass * 0.012f;
+            // Bottom edge
+            line(vc, m, nm, -h, -h,  h, -h, r, g, b, a);
+            // Top edge
+            line(vc, m, nm, -h,  h,  h,  h, r, g, b, a);
+            // Left edge
+            line(vc, m, nm, -h, -h, -h,  h, r, g, b, a);
+            // Right edge
+            line(vc, m, nm,  h, -h,  h,  h, r, g, b, a);
+        }
     }
 
-    private static void addRect(VertexConsumer vc, Matrix4f m,
-                                float x0, float y0, float x1, float y1,
-                                float r, float g, float b, float a) {
-        vc.vertex(m, x0, y0, 0f).color(r, g, b, a).endVertex();
-        vc.vertex(m, x1, y0, 0f).color(r, g, b, a).endVertex();
-        vc.vertex(m, x1, y1, 0f).color(r, g, b, a).endVertex();
-        vc.vertex(m, x0, y1, 0f).color(r, g, b, a).endVertex();
+    private static void line(VertexConsumer vc, Matrix4f m, Matrix3f nm,
+                             float x0, float y0, float x1, float y1,
+                             float r, float g, float b, float a) {
+        vc.vertex(m, x0, y0, 0f).color(r, g, b, a).normal(nm, 0f, 0f, 1f).endVertex();
+        vc.vertex(m, x1, y1, 0f).color(r, g, b, a).normal(nm, 0f, 0f, 1f).endVertex();
     }
 
     private void updateHover(LimboDisplayEntity entity, ShuffleAnimator anim, Camera camera) {
@@ -146,20 +152,23 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
         Vec3 eyePos  = mc.player.getEyePosition(1.0f);
         Vec3 lookVec = mc.player.getLookAngle();
 
-        Quaternionf camRot = camera.rotation();
-        Vector3f r3 = camRot.transform(new Vector3f(1, 0, 0));
-        Vector3f u3 = camRot.transform(new Vector3f(0, 1, 0));
-        Vec3 right = new Vec3(r3.x, r3.y, r3.z);
-        Vec3 up    = new Vec3(u3.x, u3.y, u3.z);
+        // Reconstruct the panel's right and up axes from the stored fixed yaw
+        float   yawRad   = (float) Math.toRadians(entity.getFacingYaw() + 180f);
+        Vector3f fwd     = new Vector3f((float) Math.sin(yawRad), 0f, -(float) Math.cos(yawRad));
+        Vector3f worldUp = new Vector3f(0f, 1f, 0f);
+        Vector3f right3  = new Vector3f(fwd).cross(worldUp).normalize();
+        Vec3 right = new Vec3(right3.x, right3.y, right3.z);
+        Vec3 up    = new Vec3(0, 1, 0);
 
+        // Apply group rotation to right/up
         double rotRad = Math.toRadians(-anim.groupRotation);
         double cosR = Math.cos(rotRad), sinR = Math.sin(rotRad);
         Vec3 rotRight = right.scale(cosR).add(up.scale(-sinR));
         Vec3 rotUp    = right.scale(sinR).add(up.scale( cosR));
 
-        Vec3   entityPos = entity.position();
-        int    bestSlot  = -1;
-        double bestDot   = -1;
+        Vec3  entityPos = entity.position();
+        int   bestSlot  = -1;
+        double bestDot  = -1;
 
         for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
             SlotState slot      = anim.slots[i];
