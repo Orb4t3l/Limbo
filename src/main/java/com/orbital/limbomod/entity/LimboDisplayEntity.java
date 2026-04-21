@@ -2,6 +2,7 @@ package com.orbital.limbomod.entity;
 
 import com.orbital.limbomod.animation.AnimPhase;
 import com.orbital.limbomod.animation.ShuffleAnimator;
+import com.orbital.limbomod.animation.SlotState;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -80,6 +81,32 @@ public class LimboDisplayEntity extends Entity {
         if (lifetimeTicks >= MAX_LIFETIME) { this.discard(); return; }
         animator.tick();
         if (animator.isDone) this.discard();
+    }
+
+    // Called by the level renderer to decide whether to do an outline pass.
+    // We return true whenever any slot has an active glow color.
+    @Override
+    public boolean isCurrentlyGlowing() {
+        if (animator == null) return false;
+        for (SlotState s : animator.slots) {
+            if (s.glowGreenAlpha > 0.001f || s.flashRedAlpha > 0.001f) return true;
+        }
+        return false;
+    }
+
+    // The outline color used for the entire outline pass.
+    // Red takes priority (so wrong-click red shows immediately),
+    // then green (for FLASH_CORRECT and correct-reveal).
+    @Override
+    public int getTeamColor() {
+        if (animator == null) return 0xFFFFFF;
+        for (SlotState s : animator.slots) {
+            if (s.flashRedAlpha > 0.001f) return 0xFF3030;
+        }
+        for (SlotState s : animator.slots) {
+            if (s.glowGreenAlpha > 0.001f) return 0x30FF50;
+        }
+        return 0xFFFFFF;
     }
 
     public void onPlayerClickSlot(int slotIndex, Player player) {
