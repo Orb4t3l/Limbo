@@ -27,12 +27,11 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
     private static final ResourceLocation EMPTY_TEXTURE =
             new ResourceLocation("limbomod", "textures/entity/empty.png");
 
-    private static final float HIT_RADIUS = 0.28f;
-    private static final float QUAD_HALF  = 0.38f;
+    private static final float HIT_RADIUS  = 0.28f;
+    private static final float GLOW_HALF   = 0.32f; // size of the glow quad in world units, independent of item scale
+    private static final float ITEM_SCALE  = 0.45f;
 
-    public LimboDisplayRenderer(EntityRendererProvider.Context ctx) {
-        super(ctx);
-    }
+    public LimboDisplayRenderer(EntityRendererProvider.Context ctx) { super(ctx); }
 
     @Override
     public void render(LimboDisplayEntity entity, float yaw, float partialTick,
@@ -55,35 +54,27 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
 
         for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
             SlotState slot = anim.slots[i];
+
             pose.pushPose();
-            pose.translate(slot.x, slot.y, (float) i * 0.0002f);
-            pose.scale(slot.scale * 0.45f, slot.scale * 0.45f, slot.scale * 0.45f);
+            pose.translate(slot.x, slot.y, i * 0.0002f);
 
-            boolean needsQuad = slot.glowGreenAlpha > 0.001f
-                    || slot.flashRedAlpha  > 0.001f
-                    || slot.hoverAlpha     > 0.001f;
+            // Flush batched draws before any direct Tesselator calls
+            if (buffers instanceof MultiBufferSource.BufferSource bs) bs.endBatch();
 
-            if (needsQuad) {
-                // Flush batched geometry before using Tesselator directly
-                if (buffers instanceof MultiBufferSource.BufferSource bs) bs.endBatch();
+            // Glow quads rendered at their own fixed size so they're always visible
+            if (slot.glowGreenAlpha > 0.001f)
+                renderColoredQuad(pose, GLOW_HALF * slot.scale, 0.10f, 1.00f, 0.20f, slot.glowGreenAlpha * 0.92f);
+            if (slot.flashRedAlpha > 0.001f)
+                renderColoredQuad(pose, GLOW_HALF * slot.scale, 1.00f, 0.10f, 0.10f, slot.flashRedAlpha  * 0.85f);
+            if (slot.hoverAlpha > 0.001f)
+                renderColoredQuad(pose, GLOW_HALF * slot.scale, 1.00f, 1.00f, 1.00f, slot.hoverAlpha     * 0.30f);
 
-                if (slot.glowGreenAlpha > 0.001f)
-                    renderColoredQuad(pose, 0.10f, 1.00f, 0.20f, slot.glowGreenAlpha * 0.90f);
-                if (slot.flashRedAlpha > 0.001f)
-                    renderColoredQuad(pose, 1.00f, 0.10f, 0.10f, slot.flashRedAlpha * 0.85f);
-                if (slot.hoverAlpha > 0.001f)
-                    renderColoredQuad(pose, 1.00f, 1.00f, 1.00f, slot.hoverAlpha    * 0.25f);
-            }
-
+            // Item rendered at its own scale on top
+            pose.scale(slot.scale * ITEM_SCALE, slot.scale * ITEM_SCALE, slot.scale * ITEM_SCALE);
             mc.getItemRenderer().renderStatic(
-                    item,
-                    ItemDisplayContext.GROUND,
-                    light,
-                    OverlayTexture.NO_OVERLAY,
-                    pose, buffers,
-                    entity.level(),
-                    entity.getId() + i
-            );
+                    item, ItemDisplayContext.GROUND,
+                    light, OverlayTexture.NO_OVERLAY,
+                    pose, buffers, entity.level(), entity.getId() + i);
 
             pose.popPose();
         }
@@ -99,7 +90,7 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
             return;
         }
 
-        Minecraft mc      = Minecraft.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         Vec3 eyePos  = mc.player.getEyePosition(1.0f);
         Vec3 lookVec = mc.player.getLookAngle();
@@ -115,15 +106,15 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
         Vec3 rotRight = right.scale(cosR).add(up.scale(-sinR));
         Vec3 rotUp    = right.scale(sinR).add(up.scale( cosR));
 
-        Vec3 entityPos = entity.position();
-        int   bestSlot = -1;
-        double bestDot = -1;
+        Vec3  entityPos = entity.position();
+        int   bestSlot  = -1;
+        double bestDot  = -1;
 
         for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
-            SlotState slot = anim.slots[i];
-            Vec3 slotWorld = entityPos
-                    .add(rotRight.scale(slot.x * slot.scale * 0.45))
-                    .add(rotUp.scale(   slot.y * slot.scale * 0.45));
+            SlotState slot      = anim.slots[i];
+            Vec3      slotWorld = entityPos
+                    .add(rotRight.scale(slot.x * slot.scale * ITEM_SCALE))
+                    .add(rotUp.scale(   slot.y * slot.scale * ITEM_SCALE));
 
             Vec3   toSlot    = slotWorld.subtract(eyePos);
             double dot       = toSlot.dot(lookVec);
@@ -147,22 +138,20 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
         }
     }
 
-    private static void renderColoredQuad(PoseStack pose, float r, float g, float b, float a) {
+    private static void renderColoredQuad(PoseStack pose, float half, float r, float g, float b, float a) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableDepthTest();
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
-        Matrix4f m = pose.last().pose();
-        float s = QUAD_HALF;
-
-        Tesselator tess = Tesselator.getInstance();
-        BufferBuilder buf = tess.getBuilder();
+        Matrix4f      m    = pose.last().pose();
+        Tesselator    tess = Tesselator.getInstance();
+        BufferBuilder buf  = tess.getBuilder();
         buf.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        buf.vertex(m, -s, -s, 0f).color(r, g, b, a).endVertex();
-        buf.vertex(m,  s, -s, 0f).color(r, g, b, a).endVertex();
-        buf.vertex(m,  s,  s, 0f).color(r, g, b, a).endVertex();
-        buf.vertex(m, -s,  s, 0f).color(r, g, b, a).endVertex();
+        buf.vertex(m, -half, -half, 0f).color(r, g, b, a).endVertex();
+        buf.vertex(m,  half, -half, 0f).color(r, g, b, a).endVertex();
+        buf.vertex(m,  half,  half, 0f).color(r, g, b, a).endVertex();
+        buf.vertex(m, -half,  half, 0f).color(r, g, b, a).endVertex();
         tess.end();
 
         RenderSystem.enableDepthTest();
@@ -170,7 +159,5 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
     }
 
     @Override
-    public ResourceLocation getTextureLocation(LimboDisplayEntity entity) {
-        return EMPTY_TEXTURE;
-    }
+    public ResourceLocation getTextureLocation(LimboDisplayEntity entity) { return EMPTY_TEXTURE; }
 }
