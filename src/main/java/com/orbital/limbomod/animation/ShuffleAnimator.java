@@ -156,9 +156,9 @@ public class ShuffleAnimator {
 
     private void advanceFromSwapPhase() {
         switch (phase) {
-            case SWAP_2 -> enterRotationPhase(AnimPhase.ROTATE_180,     180f, 10);
-            case SWAP_3 -> enterRotationPhase(AnimPhase.ROTATE_90,       90f, 6);
-            case SWAP_4 -> enterRotationPhase(AnimPhase.ROTATE_90_FINAL, 90f, 6);
+            case SWAP_2 -> enterRotationPhase(AnimPhase.ROTATE_180,      180f, 10);
+            case SWAP_3 -> enterRotationPhase(AnimPhase.ROTATE_90,        90f, 6);
+            case SWAP_4 -> enterRotationPhase(AnimPhase.ROTATE_90_FINAL,  90f, 6);
             case SWAP_5 -> enterPhase(AnimPhase.WAITING);
             default     -> {}
         }
@@ -171,9 +171,9 @@ public class ShuffleAnimator {
         if (timer >= rotDuration) {
             groupRotation = rotTarget;
             switch (phase) {
-                case ROTATE_180      -> enterSwapPhase(AnimPhase.SWAP_3, 11);
-                case ROTATE_90       -> enterSwapPhase(AnimPhase.SWAP_4, 9);
-                case ROTATE_90_FINAL -> enterSwapPhase(AnimPhase.SWAP_5, 6);
+                case ROTATE_180      -> enterSwapPhase(AnimPhase.SWAP_3, 8);  // was 11
+                case ROTATE_90       -> enterSwapPhase(AnimPhase.SWAP_4, 7);  // was 9
+                case ROTATE_90_FINAL -> enterSwapPhase(AnimPhase.SWAP_5, 5);  // was 6
                 default              -> {}
             }
         }

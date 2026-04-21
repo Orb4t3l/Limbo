@@ -27,9 +27,9 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
     private static final ResourceLocation EMPTY_TEXTURE =
             new ResourceLocation("limbomod", "textures/entity/empty.png");
 
-    private static final float HIT_RADIUS  = 0.28f;
-    private static final float GLOW_HALF   = 0.32f; // size of the glow quad in world units, independent of item scale
-    private static final float ITEM_SCALE  = 0.45f;
+    private static final float HIT_RADIUS = 0.28f;
+    private static final float GLOW_HALF  = 0.36f;
+    private static final float ITEM_SCALE = 0.45f;
 
     public LimboDisplayRenderer(EntityRendererProvider.Context ctx) { super(ctx); }
 
@@ -52,29 +52,41 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
         pose.mulPose(camera.rotation());
         pose.mulPose(Axis.ZP.rotationDegrees(-anim.groupRotation));
 
+        // ── Pass 1: render all items into the batch ───────────────────────────
         for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
             SlotState slot = anim.slots[i];
-
             pose.pushPose();
             pose.translate(slot.x, slot.y, i * 0.0002f);
-
-            // Flush batched draws before any direct Tesselator calls
-            if (buffers instanceof MultiBufferSource.BufferSource bs) bs.endBatch();
-
-            // Glow quads rendered at their own fixed size so they're always visible
-            if (slot.glowGreenAlpha > 0.001f)
-                renderColoredQuad(pose, GLOW_HALF * slot.scale, 0.10f, 1.00f, 0.20f, slot.glowGreenAlpha * 0.92f);
-            if (slot.flashRedAlpha > 0.001f)
-                renderColoredQuad(pose, GLOW_HALF * slot.scale, 1.00f, 0.10f, 0.10f, slot.flashRedAlpha  * 0.85f);
-            if (slot.hoverAlpha > 0.001f)
-                renderColoredQuad(pose, GLOW_HALF * slot.scale, 1.00f, 1.00f, 1.00f, slot.hoverAlpha     * 0.30f);
-
-            // Item rendered at its own scale on top
             pose.scale(slot.scale * ITEM_SCALE, slot.scale * ITEM_SCALE, slot.scale * ITEM_SCALE);
             mc.getItemRenderer().renderStatic(
                     item, ItemDisplayContext.GROUND,
                     light, OverlayTexture.NO_OVERLAY,
                     pose, buffers, entity.level(), entity.getId() + i);
+            pose.popPose();
+        }
+
+        // Flush all item renders to the GPU before drawing any quads on top
+        if (buffers instanceof MultiBufferSource.BufferSource bs) bs.endBatch();
+
+        // ── Pass 2: render all glow/flash/hover quads on top of items ────────
+        for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
+            SlotState slot = anim.slots[i];
+
+            boolean needsQuad = slot.glowGreenAlpha > 0.001f
+                    || slot.flashRedAlpha  > 0.001f
+                    || slot.hoverAlpha     > 0.001f;
+            if (!needsQuad) continue;
+
+            pose.pushPose();
+            // Slight Z push toward camera so quads sit in front of items
+            pose.translate(slot.x, slot.y, 0.05f + i * 0.0002f);
+
+            if (slot.glowGreenAlpha > 0.001f)
+                renderColoredQuad(pose, GLOW_HALF, 0.10f, 1.00f, 0.20f, slot.glowGreenAlpha);
+            if (slot.flashRedAlpha > 0.001f)
+                renderColoredQuad(pose, GLOW_HALF, 1.00f, 0.10f, 0.10f, slot.flashRedAlpha);
+            if (slot.hoverAlpha > 0.001f)
+                renderColoredQuad(pose, GLOW_HALF, 1.00f, 1.00f, 1.00f, slot.hoverAlpha * 0.35f);
 
             pose.popPose();
         }
