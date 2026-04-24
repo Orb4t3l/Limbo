@@ -19,19 +19,30 @@ import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.HashSet;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockBreakHandler {
 
-    private static final int MAX_DISPLAYS = 10;
+    private static final int   MAX_DISPLAYS = 10;
+    // Horizontal gap between display centers (world units).
+    // Each display's grid is ~1.65 units wide; 2.2 gives comfortable clearance.
+    private static final float DISPLAY_SPACING = 2.2f;
 
-    private final Set<String>         managedPositions = new HashSet<>();
-    private final Map<String, Float>  positionYaw      = new HashMap<>();
+    // Keyed by posKey. Stores everything needed to spawn displays at end of tick.
+    private static class PendingBreak {
+        final List<ItemStack> drops;
+        final float           playerYaw;
+        final double          centerX, centerY, centerZ;
+
+        PendingBreak(List<ItemStack> drops, float yaw, double cx, double cy, double cz) {
+            this.drops = drops; this.playerYaw = yaw;
+            this.centerX = cx; this.centerY = cy; this.centerZ = cz;
+        }
+    }
+
+    private final Map<String, PendingBreak> pendingBreaks  = new LinkedHashMap<>();
+    private final Set<String>               managedPositions = new HashSet<>();
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockEvent.BreakEvent event) {
@@ -45,52 +56,82 @@ public class BlockBreakHandler {
         BlockEntity be    = serverLevel.getBlockEntity(pos);
         ItemStack   tool  = player.getMainHandItem();
 
-        List<ItemStack> previewDrops = Block.getDrops(state, serverLevel, pos, be, player, tool);
-        if (previewDrops.isEmpty()) return;
+        List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, be, player, tool);
+        if (drops.isEmpty()) return;
 
         String key = posKey(serverLevel, pos);
         managedPositions.add(key);
-        // Store player yaw so the display faces toward them
-        positionYaw.put(key, player.getYRot());
+        pendingBreaks.put(key, new PendingBreak(
+                drops,
+                player.getYRot(),
+                pos.getX() + 0.5,
+                pos.getY() + 1.5,
+                pos.getZ() + 0.5
+        ));
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;
         if (!(event.getEntity() instanceof ItemEntity itemEntity)) return;
-
-        Level    level = event.getLevel();
-        BlockPos pos   = BlockPos.containing(itemEntity.position());
-        String   key   = posKey(level, pos);
-
-        if (!managedPositions.contains(key)) return;
-        event.setCanceled(true);
-
-        ItemStack drop = itemEntity.getItem().copy();
-        if (drop.isEmpty()) return;
-
-        long existing = ((ServerLevel) level)
-                .getEntities(LimboEntities.LIMBO_DISPLAY.get(), e -> true)
-                .size();
-        if (existing >= MAX_DISPLAYS) return;
-
-        float yaw  = positionYaw.getOrDefault(key, 0f);
-        long  seed = ThreadLocalRandom.current().nextLong();
-
-        LimboDisplayEntity display = new LimboDisplayEntity(level, drop, seed, yaw);
-        display.setPos(pos.getX() + 0.5, pos.getY() + 1.5, pos.getZ() + 0.5);
-        ((ServerLevel) level).addFreshEntity(display);
-
-        level.playSound(null, pos, LimboSounds.LIMBO_MUSIC.get(),
-                SoundSource.RECORDS, 4.0f, 1.0f);
+        BlockPos pos = BlockPos.containing(itemEntity.position());
+        if (managedPositions.contains(posKey(event.getLevel(), pos))) {
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent
     public void onLevelTickEnd(TickEvent.LevelTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && !event.level.isClientSide()) {
-            managedPositions.clear();
-            positionYaw.clear();
+        if (event.phase != TickEvent.Phase.END) return;
+        if (event.level.isClientSide()) return;
+        if (!(event.level instanceof ServerLevel serverLevel)) return;
+
+        for (PendingBreak pending : pendingBreaks.values()) {
+            spawnDisplays(serverLevel, pending);
         }
+
+        pendingBreaks.clear();
+        managedPositions.clear();
+    }
+
+    private static void spawnDisplays(ServerLevel level, PendingBreak pending) {
+        List<ItemStack> drops = pending.drops;
+        int count = drops.size();
+
+        // Check how many displays already exist — cap the total
+        int existing = level.getEntities(LimboEntities.LIMBO_DISPLAY.get(), e -> true).size();
+        int canSpawn = Math.min(count, MAX_DISPLAYS - existing);
+        if (canSpawn <= 0) return;
+
+        // Compute the right-hand perpendicular to the player's facing direction
+        // so displays spread sideways relative to the player, not into them.
+        double yawRad  = Math.toRadians(pending.playerYaw);
+        // Perpendicular to yaw in XZ: rotate yaw by 90°
+        double perpX   =  Math.cos(yawRad);
+        double perpZ   = -Math.sin(yawRad);
+
+        // Total spread width centred on the block position.
+        // With N displays, there are N-1 gaps between them.
+        // offsetForIndex(i) = (i - (count-1)/2.0) * DISPLAY_SPACING
+        for (int i = 0; i < canSpawn; i++) {
+            ItemStack drop = drops.get(i);
+            if (drop.isEmpty()) continue;
+
+            double offset = (i - (count - 1) / 2.0) * DISPLAY_SPACING;
+            double spawnX = pending.centerX + perpX * offset;
+            double spawnY = pending.centerY;
+            double spawnZ = pending.centerZ + perpZ * offset;
+
+            long seed = ThreadLocalRandom.current().nextLong();
+            LimboDisplayEntity display = new LimboDisplayEntity(
+                    level, drop, seed, spawnX, spawnY, spawnZ, pending.playerYaw);
+            level.addFreshEntity(display);
+        }
+
+        // One music cue for the whole break regardless of drop count
+        BlockPos pos = BlockPos.containing(pending.centerX, pending.centerY, pending.centerZ);
+        level.playSound(null, pos, LimboSounds.LIMBO_MUSIC.get(),
+                SoundSource.RECORDS, 4.0f, 1.0f);
     }
 
     private static String posKey(Level level, BlockPos pos) {

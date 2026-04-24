@@ -27,7 +27,6 @@ public class LimboDisplayEntity extends Entity {
             SynchedEntityData.defineId(LimboDisplayEntity.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<Float> DATA_FACING_YAW =
             SynchedEntityData.defineId(LimboDisplayEntity.class, EntityDataSerializers.FLOAT);
-    // -1 = not yet clicked, 0-7 = slot index that was clicked
     private static final EntityDataAccessor<Integer> DATA_CLICKED_SLOT =
             SynchedEntityData.defineId(LimboDisplayEntity.class, EntityDataSerializers.INT);
 
@@ -42,13 +41,15 @@ public class LimboDisplayEntity extends Entity {
         this.setNoGravity(true);
     }
 
-    public LimboDisplayEntity(Level level, ItemStack item, long seed, float facingYaw) {
+    public LimboDisplayEntity(Level level, ItemStack item, long seed,
+                              double x, double y, double z, float facingYaw) {
         this(LimboEntities.LIMBO_DISPLAY.get(), level);
         this.displayItem = item.copy();
         this.entityData.set(DATA_ITEM, item.copy());
         this.entityData.set(DATA_SEED, seed);
         this.entityData.set(DATA_FACING_YAW, facingYaw);
         this.entityData.set(DATA_CLICKED_SLOT, -1);
+        this.setPos(x, y, z);
         initAnimator(seed);
     }
 
@@ -63,8 +64,6 @@ public class LimboDisplayEntity extends Entity {
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         super.onSyncedDataUpdated(key);
-
-        // Init animator once seed + item are both available
         if (!initialized) {
             long      seed = entityData.get(DATA_SEED);
             ItemStack item = entityData.get(DATA_ITEM);
@@ -73,15 +72,9 @@ public class LimboDisplayEntity extends Entity {
                 initAnimator(seed);
             }
         }
-
-        // When DATA_CLICKED_SLOT is synced from server → client,
-        // trigger onSlotClicked on the client-side animator so it
-        // enters RESULT_FLASH and drives the glow alphas correctly.
         if (key == DATA_CLICKED_SLOT && level().isClientSide()) {
             int clicked = entityData.get(DATA_CLICKED_SLOT);
-            if (clicked >= 0 && animator != null) {
-                animator.onSlotClicked(clicked);
-            }
+            if (clicked >= 0 && animator != null) animator.onSlotClicked(clicked);
         }
     }
 
@@ -114,14 +107,8 @@ public class LimboDisplayEntity extends Entity {
     public void onPlayerClickSlot(int slotIndex, Player player) {
         if (animator == null || animator.getPhase() != AnimPhase.WAITING) return;
         boolean correct = (slotIndex == animator.getCorrectVisualSlot());
-
-        // Sync the click to the client — onSyncedDataUpdated triggers
-        // animator.onSlotClicked() there
         entityData.set(DATA_CLICKED_SLOT, slotIndex);
-
-        // Also trigger server-side animator
         animator.onSlotClicked(slotIndex);
-
         if (correct) {
             ItemEntity drop = new ItemEntity(level(), getX(), getY(), getZ(), displayItem.copy());
             drop.setDefaultPickUpDelay();
