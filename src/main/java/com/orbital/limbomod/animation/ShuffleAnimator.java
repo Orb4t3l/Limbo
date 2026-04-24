@@ -165,24 +165,13 @@ public class ShuffleAnimator {
     }
 
     private void tickResultFlash() {
-        float alpha = Math.max(0f, 1f - (timer % 19) / 18f);
+        float alpha = Math.max(0f, 1f - timer / 36f);
 
-        if (timer <= 18) {
-            // First 18 ticks: flash clicked slot — green if correct, red if wrong
-            if (clickedSlot >= 0) {
-                if (resultIsCorrect) slots[clickedSlot].glowGreenAlpha = alpha;
-                else                 slots[clickedSlot].flashRedAlpha  = alpha;
-            }
+        if (resultIsCorrect) {
+            slots[clickedSlot].glowGreenAlpha = alpha;
         } else {
-            // Clear first flash
-            if (clickedSlot >= 0) {
-                slots[clickedSlot].glowGreenAlpha = 0f;
-                slots[clickedSlot].flashRedAlpha  = 0f;
-            }
-            // If wrong: reveal correct slot in green for ticks 18-36
-            if (!resultIsCorrect) {
-                slots[correctVisualSlot].glowGreenAlpha = Math.max(0f, 1f - (timer - 18) / 18f);
-            }
+            slots[clickedSlot].flashRedAlpha          = alpha;
+            slots[correctVisualSlot].glowGreenAlpha   = alpha;
         }
 
         if (timer >= 36) {

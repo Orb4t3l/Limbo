@@ -83,31 +83,18 @@ public class LimboDisplayEntity extends Entity {
         if (animator.isDone) this.discard();
     }
 
-    // Called by the level renderer to decide whether to do an outline pass.
-    // We return true whenever any slot has an active glow color.
     @Override
     public boolean isCurrentlyGlowing() {
         if (animator == null) return false;
-        for (SlotState s : animator.slots) {
+        for (SlotState s : animator.slots)
             if (s.glowGreenAlpha > 0.001f || s.flashRedAlpha > 0.001f) return true;
-        }
         return false;
     }
 
-    // The outline color used for the entire outline pass.
-    // Red takes priority (so wrong-click red shows immediately),
-    // then green (for FLASH_CORRECT and correct-reveal).
+    // Returning white means the level renderer won't tint or override the
+    // per-slot colors we set via obs.setColor() inside the renderer.
     @Override
-    public int getTeamColor() {
-        if (animator == null) return 0xFFFFFF;
-        for (SlotState s : animator.slots) {
-            if (s.flashRedAlpha > 0.001f) return 0xFF3030;
-        }
-        for (SlotState s : animator.slots) {
-            if (s.glowGreenAlpha > 0.001f) return 0x30FF50;
-        }
-        return 0xFFFFFF;
-    }
+    public int getTeamColor() { return 0xFFFFFF; }
 
     public void onPlayerClickSlot(int slotIndex, Player player) {
         if (animator == null || animator.getPhase() != AnimPhase.WAITING) return;

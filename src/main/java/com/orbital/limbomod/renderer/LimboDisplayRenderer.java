@@ -41,13 +41,6 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
         ItemStack item = entity.getDisplayItem();
         if (item.isEmpty()) return;
 
-        // The level renderer calls render() twice when isCurrentlyGlowing() is true:
-        // 1. Normal pass — buffers is a regular BufferSource
-        // 2. Outline pass — buffers is an OutlineBufferSource
-        //
-        // In the outline pass we only render the slots that have active glow,
-        // so the vanilla Sobel edge shader produces an outline only around those
-        // slots. Every other slot is invisible in this pass and gets no outline.
         boolean isOutlinePass = buffers instanceof OutlineBufferSource;
 
         updateHover(entity, anim);
@@ -59,25 +52,33 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
         Minecraft mc = Minecraft.getInstance();
 
         for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
-            SlotState slot  = anim.slots[i];
-            boolean hasGlow = slot.glowGreenAlpha > 0.001f || slot.flashRedAlpha > 0.001f;
+            SlotState slot = anim.slots[i];
 
-            // In the outline pass: skip any slot that has no active glow.
-            // This means only the correct/clicked slot gets the outline halo.
-            if (isOutlinePass && !hasGlow) continue;
+            if (isOutlinePass) {
+                // Render every slot in the outline pass so the outline framebuffer
+                // is fully populated — skipping slots causes the Sobel shader to
+                // bleed outlines into the gaps and makes items flash/disappear.
+                // Non-glowing slots get color (0,0,0,0): invisible but depth-present.
+                OutlineBufferSource obs = (OutlineBufferSource) buffers;
+                if (slot.glowGreenAlpha > 0.001f) {
+                    obs.setColor(50, 255, 80, 255);
+                } else if (slot.flashRedAlpha > 0.001f) {
+                    obs.setColor(255, 50, 50, 255);
+                } else {
+                    obs.setColor(0, 0, 0, 0);
+                }
+            }
 
             pose.pushPose();
             pose.translate(slot.x, slot.y, i * 0.001f);
             pose.scale(slot.scale * ITEM_SCALE, slot.scale * ITEM_SCALE, slot.scale * ITEM_SCALE);
-
             mc.getItemRenderer().renderStatic(
                     item, ItemDisplayContext.FIXED, light, OverlayTexture.NO_OVERLAY,
                     pose, buffers, entity.level(), entity.getId() + i);
-
             pose.popPose();
         }
 
-        // Hover outline — only on normal pass, only during WAITING
+        // Hover outline — normal pass only, WAITING phase only
         if (!isOutlinePass && anim.getPhase() == AnimPhase.WAITING) {
             if (buffers instanceof MultiBufferSource.BufferSource bs) bs.endBatch();
 
@@ -129,7 +130,7 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
         Vec3 eyePos  = mc.player.getEyePosition(1.0f);
         Vec3 lookVec = mc.player.getLookAngle();
 
-        // Build the identical rotation matrix the renderer uses — guaranteed match
+        // Exact same rotation the renderer applies — guaranteed world-space match.
         Matrix4f rot = new Matrix4f()
                 .rotateY((float) Math.toRadians(-(entity.getFacingYaw() + 180f)))
                 .rotateZ((float) Math.toRadians(-anim.groupRotation));
@@ -139,18 +140,22 @@ public class LimboDisplayRenderer extends EntityRenderer<LimboDisplayEntity> {
         double bestDist  = HIT_RADIUS;
 
         for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
-            SlotState slot  = anim.slots[i];
-            float     sc    = slot.scale * ITEM_SCALE;
-            Vector4f  local = new Vector4f(slot.x * sc, slot.y * sc, 0f, 1f);
-            rot.transform(local);
-            Vec3      slotW = entityPos.add(local.x, local.y, local.z);
+            SlotState slot = anim.slots[i];
 
-            Vec3   toSlot = slotW.subtract(eyePos);
+            // slot.x / slot.y are the raw translation values the renderer uses —
+            // do NOT multiply by scale here; scale only affects item size, not center.
+            Vector4f local = new Vector4f(slot.x, slot.y, 0f, 1f);
+            rot.transform(local);
+            Vec3 slotWorld = entityPos.add(local.x, local.y, local.z);
+
+            Vec3   toSlot = slotWorld.subtract(eyePos);
             double dot    = toSlot.dot(lookVec);
             if (dot < 0 || dot > 12) { slot.hoverAlpha *= 0.7f; continue; }
 
-            double dist = eyePos.add(lookVec.scale(dot)).distanceTo(slotW);
-            if (dist < bestDist) { bestDist = dist; bestSlot = i; }
+            // Scale hit radius with item scale so smaller items are proportionally harder to hit
+            double scaledHit = HIT_RADIUS * slot.scale;
+            double dist = eyePos.add(lookVec.scale(dot)).distanceTo(slotWorld);
+            if (dist < scaledHit && dist < bestDist) { bestDist = dist; bestSlot = i; }
         }
 
         for (int i = 0; i < ShuffleAnimator.SLOT_COUNT; i++) {
