@@ -24,12 +24,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockBreakHandler {
 
-    private static final int   MAX_DISPLAYS = 10;
-    // Horizontal gap between display centers (world units).
-    // Each display's grid is ~1.65 units wide; 2.2 gives comfortable clearance.
+    private static final int   MAX_DISPLAYS    = 10;
     private static final float DISPLAY_SPACING = 2.2f;
 
-    // Keyed by posKey. Stores everything needed to spawn displays at end of tick.
     private static class PendingBreak {
         final List<ItemStack> drops;
         final float           playerYaw;
@@ -41,7 +38,7 @@ public class BlockBreakHandler {
         }
     }
 
-    private final Map<String, PendingBreak> pendingBreaks  = new LinkedHashMap<>();
+    private final Map<String, PendingBreak> pendingBreaks    = new LinkedHashMap<>();
     private final Set<String>               managedPositions = new HashSet<>();
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -51,10 +48,14 @@ public class BlockBreakHandler {
         Player player = event.getPlayer();
         if (player == null) return;
 
+        if (player.isCreative()) return;
+
         BlockPos    pos   = event.getPos();
         BlockState  state = serverLevel.getBlockState(pos);
         BlockEntity be    = serverLevel.getBlockEntity(pos);
         ItemStack   tool  = player.getMainHandItem();
+
+        if (state.requiresCorrectToolForDrops() && !tool.isCorrectToolForDrops(state)) return;
 
         List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, be, player, tool);
         if (drops.isEmpty()) return;
@@ -95,40 +96,29 @@ public class BlockBreakHandler {
     }
 
     private static void spawnDisplays(ServerLevel level, PendingBreak pending) {
-        List<ItemStack> drops = pending.drops;
-        int count = drops.size();
-
-        // Check how many displays already exist — cap the total
+        int count    = pending.drops.size();
         int existing = level.getEntities(LimboEntities.LIMBO_DISPLAY.get(), e -> true).size();
         int canSpawn = Math.min(count, MAX_DISPLAYS - existing);
         if (canSpawn <= 0) return;
 
-        // Compute the right-hand perpendicular to the player's facing direction
-        // so displays spread sideways relative to the player, not into them.
-        double yawRad  = Math.toRadians(pending.playerYaw);
-        // Perpendicular to yaw in XZ: rotate yaw by 90°
-        double perpX   =  Math.cos(yawRad);
-        double perpZ   = -Math.sin(yawRad);
+        double yawRad = Math.toRadians(pending.playerYaw);
+        double perpX  =  Math.cos(yawRad);
+        double perpZ  = -Math.sin(yawRad);
 
-        // Total spread width centred on the block position.
-        // With N displays, there are N-1 gaps between them.
-        // offsetForIndex(i) = (i - (count-1)/2.0) * DISPLAY_SPACING
         for (int i = 0; i < canSpawn; i++) {
-            ItemStack drop = drops.get(i);
+            ItemStack drop = pending.drops.get(i);
             if (drop.isEmpty()) continue;
 
             double offset = (i - (count - 1) / 2.0) * DISPLAY_SPACING;
             double spawnX = pending.centerX + perpX * offset;
-            double spawnY = pending.centerY;
             double spawnZ = pending.centerZ + perpZ * offset;
 
             long seed = ThreadLocalRandom.current().nextLong();
             LimboDisplayEntity display = new LimboDisplayEntity(
-                    level, drop, seed, spawnX, spawnY, spawnZ, pending.playerYaw);
+                    level, drop, seed, spawnX, pending.centerY, spawnZ, pending.playerYaw);
             level.addFreshEntity(display);
         }
 
-        // One music cue for the whole break regardless of drop count
         BlockPos pos = BlockPos.containing(pending.centerX, pending.centerY, pending.centerZ);
         level.playSound(null, pos, LimboSounds.LIMBO_MUSIC.get(),
                 SoundSource.RECORDS, 4.0f, 1.0f);
