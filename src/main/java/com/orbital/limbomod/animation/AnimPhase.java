@@ -12,5 +12,6 @@ public enum AnimPhase {
     SWAP_5,
     WAITING,
     RESULT_FLASH,
+    FADEOUT,
     DONE
 }

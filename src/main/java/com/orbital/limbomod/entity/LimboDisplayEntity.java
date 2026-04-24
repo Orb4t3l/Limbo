@@ -27,6 +27,9 @@ public class LimboDisplayEntity extends Entity {
             SynchedEntityData.defineId(LimboDisplayEntity.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<Float> DATA_FACING_YAW =
             SynchedEntityData.defineId(LimboDisplayEntity.class, EntityDataSerializers.FLOAT);
+    // -1 = not yet clicked, 0-7 = slot index that was clicked
+    private static final EntityDataAccessor<Integer> DATA_CLICKED_SLOT =
+            SynchedEntityData.defineId(LimboDisplayEntity.class, EntityDataSerializers.INT);
 
     private ShuffleAnimator animator;
     private ItemStack        displayItem   = ItemStack.EMPTY;
@@ -45,6 +48,7 @@ public class LimboDisplayEntity extends Entity {
         this.entityData.set(DATA_ITEM, item.copy());
         this.entityData.set(DATA_SEED, seed);
         this.entityData.set(DATA_FACING_YAW, facingYaw);
+        this.entityData.set(DATA_CLICKED_SLOT, -1);
         initAnimator(seed);
     }
 
@@ -53,17 +57,30 @@ public class LimboDisplayEntity extends Entity {
         entityData.define(DATA_ITEM, ItemStack.EMPTY);
         entityData.define(DATA_SEED, 0L);
         entityData.define(DATA_FACING_YAW, 0f);
+        entityData.define(DATA_CLICKED_SLOT, -1);
     }
 
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         super.onSyncedDataUpdated(key);
+
+        // Init animator once seed + item are both available
         if (!initialized) {
             long      seed = entityData.get(DATA_SEED);
             ItemStack item = entityData.get(DATA_ITEM);
             if (seed != 0L && !item.isEmpty()) {
                 displayItem = item.copy();
                 initAnimator(seed);
+            }
+        }
+
+        // When DATA_CLICKED_SLOT is synced from server → client,
+        // trigger onSlotClicked on the client-side animator so it
+        // enters RESULT_FLASH and drives the glow alphas correctly.
+        if (key == DATA_CLICKED_SLOT && level().isClientSide()) {
+            int clicked = entityData.get(DATA_CLICKED_SLOT);
+            if (clicked >= 0 && animator != null) {
+                animator.onSlotClicked(clicked);
             }
         }
     }
@@ -91,15 +108,20 @@ public class LimboDisplayEntity extends Entity {
         return false;
     }
 
-    // Returning white means the level renderer won't tint or override the
-    // per-slot colors we set via obs.setColor() inside the renderer.
     @Override
     public int getTeamColor() { return 0xFFFFFF; }
 
     public void onPlayerClickSlot(int slotIndex, Player player) {
         if (animator == null || animator.getPhase() != AnimPhase.WAITING) return;
         boolean correct = (slotIndex == animator.getCorrectVisualSlot());
+
+        // Sync the click to the client — onSyncedDataUpdated triggers
+        // animator.onSlotClicked() there
+        entityData.set(DATA_CLICKED_SLOT, slotIndex);
+
+        // Also trigger server-side animator
         animator.onSlotClicked(slotIndex);
+
         if (correct) {
             ItemEntity drop = new ItemEntity(level(), getX(), getY(), getZ(), displayItem.copy());
             drop.setDefaultPickUpDelay();

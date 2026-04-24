@@ -9,6 +9,8 @@ public class ShuffleAnimator {
     private static final int   INTRO_SCALE_TICKS = 10;
     private static final int   INTRO_SPLIT_TICKS = 12;
     private static final int   FLASH_TICKS       = 26;
+    private static final int   RESULT_TICKS      = 40;
+    private static final int   FADEOUT_TICKS     = 25;
     private static final float SPACING_X         = 0.55f;
     private static final float SPACING_Y         = 0.55f;
 
@@ -36,13 +38,15 @@ public class ShuffleAnimator {
     public  boolean resultIsCorrect = false;
     public  boolean isDone          = false;
 
+    // Snapshot of each slot's scale when FADEOUT begins
+    private final float[] fadeStartScale = new float[SLOT_COUNT];
+
     private final Random rng;
 
     public ShuffleAnimator(long seed) {
         this.rng = new Random(seed);
         for (int i = 0; i < SLOT_COUNT; i++) {
-            int col = i % 4;
-            int row = i / 4;
+            int col = i % 4; int row = i / 4;
             gridX[i] = (col - 1.5f) * SPACING_X;
             gridY[i] = (0.5f - row) * SPACING_Y;
         }
@@ -57,12 +61,13 @@ public class ShuffleAnimator {
         timer++;
         switch (phase) {
             case INTRO                                    -> tickIntro();
-            case FLASH_CORRECT                           -> tickFlashCorrect();
-            case SWAP_2, SWAP_3, SWAP_4, SWAP_5         -> tickSwaps();
-            case ROTATE_180, ROTATE_90, ROTATE_90_FINAL -> tickRotation();
-            case WAITING                                 -> tickWaiting();
-            case RESULT_FLASH                            -> tickResultFlash();
-            case DONE                                    -> isDone = true;
+            case FLASH_CORRECT                            -> tickFlashCorrect();
+            case SWAP_2, SWAP_3, SWAP_4, SWAP_5          -> tickSwaps();
+            case ROTATE_180, ROTATE_90, ROTATE_90_FINAL  -> tickRotation();
+            case WAITING                                  -> tickWaiting();
+            case RESULT_FLASH                             -> tickResultFlash();
+            case FADEOUT                                  -> tickFadeout();
+            case DONE                                     -> isDone = true;
         }
     }
 
@@ -129,7 +134,7 @@ public class ShuffleAnimator {
             int tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
         }
         for (int i = 0; i < SLOT_COUNT; i++) {
-            slots[i].startX  = slots[i].x;  slots[i].startY  = slots[i].y;
+            slots[i].startX  = slots[i].x;   slots[i].startY  = slots[i].y;
             slots[i].targetX = curX[perm[i]]; slots[i].targetY = curY[perm[i]];
         }
         swapTimer = 0; swapping = true;
@@ -165,19 +170,33 @@ public class ShuffleAnimator {
     }
 
     private void tickResultFlash() {
-        float alpha = Math.max(0f, 1f - timer / 36f);
+        // Linear fade from 1 → 0 over RESULT_TICKS
+        float alpha = Math.max(0f, 1f - timer / (float) RESULT_TICKS);
 
         if (resultIsCorrect) {
             slots[clickedSlot].glowGreenAlpha = alpha;
         } else {
-            slots[clickedSlot].flashRedAlpha          = alpha;
-            slots[correctVisualSlot].glowGreenAlpha   = alpha;
+            slots[clickedSlot].flashRedAlpha        = alpha;
+            slots[correctVisualSlot].glowGreenAlpha = alpha;
         }
 
-        if (timer >= 36) {
+        if (timer >= RESULT_TICKS) {
             for (SlotState s : slots) { s.glowGreenAlpha = 0f; s.flashRedAlpha = 0f; }
-            enterPhase(AnimPhase.DONE);
+            enterFadeout();
         }
+    }
+
+    private void enterFadeout() {
+        for (int i = 0; i < SLOT_COUNT; i++) fadeStartScale[i] = slots[i].scale;
+        enterPhase(AnimPhase.FADEOUT);
+    }
+
+    private void tickFadeout() {
+        float t = Math.min(1f, timer / (float) FADEOUT_TICKS);
+        for (int i = 0; i < SLOT_COUNT; i++) {
+            slots[i].scale = lerp(fadeStartScale[i], 0f, easeInOutCubic(t));
+        }
+        if (timer >= FADEOUT_TICKS) enterPhase(AnimPhase.DONE);
     }
 
     public void onSlotClicked(int slotIndex) {
