@@ -21,12 +21,28 @@ public class MobDropHandler {
 
     @SubscribeEvent
     public void onMobDrops(LivingDropsEvent event) {
-        if (event.getEntity().level().isClientSide()) return;
-        if (!(event.getEntity().level() instanceof ServerLevel serverLevel)) return;
-        if (event.getDrops().isEmpty()) return;
+        System.out.println("[LimboMod] onMobDrops fired for: " + event.getEntity().getType().toShortString());
+
+        if (event.getEntity().level().isClientSide()) {
+            System.out.println("[LimboMod] Skipping — client side");
+            return;
+        }
+        if (!(event.getEntity().level() instanceof ServerLevel serverLevel)) {
+            System.out.println("[LimboMod] Skipping — not a ServerLevel");
+            return;
+        }
+        if (event.getDrops().isEmpty()) {
+            System.out.println("[LimboMod] Skipping — drops list is empty");
+            return;
+        }
+
+        System.out.println("[LimboMod] Drop count: " + event.getDrops().size());
 
         Player player = null;
         if (event.getSource().getEntity() instanceof Player p) player = p;
+
+        System.out.println("[LimboMod] Killed by player: " + (player != null) + ", creative: " + (player != null && player.isCreative()));
+
         if (player != null && player.isCreative()) return;
 
         List<ItemStack> drops = event.getDrops().stream()
@@ -34,18 +50,24 @@ public class MobDropHandler {
                 .filter(s -> !s.isEmpty())
                 .toList();
 
+        System.out.println("[LimboMod] Valid drops after filter: " + drops.size());
+        drops.forEach(d -> System.out.println("[LimboMod]   - " + d.getDisplayName().getString() + " x" + d.getCount()));
+
         if (drops.isEmpty()) return;
 
-        event.setCanceled(true);
+        event.getDrops().clear();
+        System.out.println("[LimboMod] Drops list cleared, size now: " + event.getDrops().size());
 
         double spawnX = event.getEntity().getX();
         double spawnY = event.getEntity().getY() + 1.0;
         double spawnZ = event.getEntity().getZ();
-
-        float yaw = player != null ? player.getYRot() : event.getEntity().getYRot();
+        float  yaw    = player != null ? player.getYRot() : event.getEntity().getYRot();
 
         int existing = serverLevel.getEntities(LimboEntities.LIMBO_DISPLAY.get(), e -> true).size();
         int canSpawn = Math.min(drops.size(), MAX_DISPLAYS - existing);
+
+        System.out.println("[LimboMod] Existing displays: " + existing + ", canSpawn: " + canSpawn);
+
         if (canSpawn <= 0) return;
 
         double yawRad = Math.toRadians(yaw);
@@ -61,10 +83,12 @@ public class MobDropHandler {
                     spawnY,
                     spawnZ + perpZ * offset,
                     yaw);
-            serverLevel.addFreshEntity(display);
+            boolean added = serverLevel.addFreshEntity(display);
+            System.out.println("[LimboMod] Spawned display for " + drops.get(i).getDisplayName().getString() + " — addFreshEntity returned: " + added);
         }
 
         serverLevel.playSound(null, event.getEntity().blockPosition(),
                 LimboSounds.LIMBO_MUSIC.get(), SoundSource.RECORDS, 4.0f, 1.0f);
+        System.out.println("[LimboMod] Done.");
     }
 }
