@@ -9,9 +9,10 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -23,30 +24,47 @@ public class FallingBlockHandler {
     private static final int   MAX_DISPLAYS    = 10;
     private static final float DISPLAY_SPACING = 2.2f;
 
-    private final Map<String, List<ItemStack>> pendingDrops = new LinkedHashMap<>();
+    private final Map<Integer, FallingBlockEntity> trackedFallers = new HashMap<>();
+    private final Map<String,  List<ItemStack>>    pendingDrops   = new LinkedHashMap<>();
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;
-        if (!(event.getEntity() instanceof ItemEntity itemEntity)) return;
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
 
-        AABB search = new AABB(itemEntity.position(), itemEntity.position()).inflate(2.0);
-        List<FallingBlockEntity> nearby = serverLevel.getEntitiesOfClass(
-                FallingBlockEntity.class, search);
+        if (event.getEntity() instanceof FallingBlockEntity faller) {
+            trackedFallers.put(faller.getId(), faller);
+            return;
+        }
 
-        if (nearby.isEmpty()) return;
+        if (!(event.getEntity() instanceof ItemEntity itemEntity)) return;
 
-        FallingBlockEntity faller = nearby.get(0);
-        BlockPos fp = BlockPos.containing(faller.position());
+        Vec3 ip = itemEntity.position();
 
-        event.setCanceled(true);
-        ItemStack drop = itemEntity.getItem().copy();
-        if (drop.isEmpty()) return;
+        for (FallingBlockEntity faller : trackedFallers.values()) {
+            Vec3 fp = faller.position();
+            if (Math.abs(fp.x - ip.x) <= 2.0
+                    && Math.abs(fp.y - ip.y) <= 2.0
+                    && Math.abs(fp.z - ip.z) <= 2.0) {
 
-        String key = serverLevel.dimension().location()
-                + ":" + fp.getX() + "," + fp.getY() + "," + fp.getZ();
-        pendingDrops.computeIfAbsent(key, k -> new ArrayList<>()).add(drop);
+                event.setCanceled(true);
+                ItemStack drop = itemEntity.getItem().copy();
+                if (drop.isEmpty()) return;
+
+                String key = serverLevel.dimension().location()
+                        + ":" + (int)fp.x + "," + (int)fp.y + "," + (int)fp.z;
+                pendingDrops.computeIfAbsent(key, k -> new ArrayList<>()).add(drop);
+                return;
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public void onEntityLeave(EntityLeaveLevelEvent event) {
+        if (event.getLevel().isClientSide()) return;
+        if (event.getEntity() instanceof FallingBlockEntity f) {
+            trackedFallers.remove(f.getId());
+        }
     }
 
     @SubscribeEvent
@@ -60,7 +78,7 @@ public class FallingBlockHandler {
             List<ItemStack> drops = entry.getValue();
             if (drops.isEmpty()) continue;
 
-            String[] parts = entry.getKey().split(":");
+            String[] parts  = entry.getKey().split(":");
             if (parts.length < 2) continue;
             String[] coords = parts[1].split(",");
             if (coords.length < 3) continue;
