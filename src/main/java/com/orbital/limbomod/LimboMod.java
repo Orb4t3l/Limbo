@@ -2,10 +2,7 @@ package com.orbital.limbomod;
 
 import com.orbital.limbomod.entity.LimboDisplayEntity;
 import com.orbital.limbomod.entity.LimboEntities;
-import com.orbital.limbomod.events.BlockBreakHandler;
-import com.orbital.limbomod.events.ClientClickHandler;
-import com.orbital.limbomod.events.CraftingHandler;
-import com.orbital.limbomod.events.MobDropHandler;
+import com.orbital.limbomod.events.*;
 import com.orbital.limbomod.network.LimboNetwork;
 import com.orbital.limbomod.renderer.LimboDisplayRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderers;
@@ -35,6 +32,7 @@ public class LimboMod {
         MinecraftForge.EVENT_BUS.register(new BlockBreakHandler());
         MinecraftForge.EVENT_BUS.register(new MobDropHandler());
         MinecraftForge.EVENT_BUS.register(new CraftingHandler());
+        MinecraftForge.EVENT_BUS.register(new TradeHandler());
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             MinecraftForge.EVENT_BUS.register(new ClientClickHandler());
