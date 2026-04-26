@@ -31,6 +31,7 @@ public class FishingHandler {
         if (drops.isEmpty()) return;
 
         event.getDrops().clear();
+        event.setCanceled(true);
 
         int existing = serverLevel.getEntities(LimboEntities.LIMBO_DISPLAY.get(), e -> true).size();
         int canSpawn = Math.min(drops.size(), MAX_DISPLAYS - existing);
