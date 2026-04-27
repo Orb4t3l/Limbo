@@ -16,6 +16,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.network.NetworkHooks;
 
@@ -37,8 +38,9 @@ public class LimboDisplayEntity extends Entity {
     private boolean          initialized   = false;
     private int              lifetimeTicks = 0;
 
-    private BlockPos   successPlacePos   = null;
-    private BlockState successPlaceState = null;
+    private BlockPos    successPlacePos   = null;
+    private BlockState  successPlaceState = null;
+    private CompoundTag successPlaceNbt   = null;
 
     public LimboDisplayEntity(EntityType<?> type, Level level) {
         super(type, level);
@@ -58,9 +60,14 @@ public class LimboDisplayEntity extends Entity {
         initAnimator(seed);
     }
 
-    public void setSuccessPlacement(BlockPos pos, BlockState state) {
+    public void setSuccessPlacement(BlockPos pos, BlockState state, CompoundTag nbt) {
         this.successPlacePos   = pos;
         this.successPlaceState = state;
+        this.successPlaceNbt   = nbt;
+    }
+
+    public void setSuccessPlacement(BlockPos pos, BlockState state) {
+        setSuccessPlacement(pos, state, null);
     }
 
     @Override
@@ -122,6 +129,13 @@ public class LimboDisplayEntity extends Entity {
         if (correct) {
             if (successPlacePos != null && successPlaceState != null) {
                 level().setBlock(successPlacePos, successPlaceState, 3);
+                if (successPlaceNbt != null
+                        && level().getBlockEntity(successPlacePos) instanceof RandomizableContainerBlockEntity be) {
+                    successPlaceNbt.putInt("x", successPlacePos.getX());
+                    successPlaceNbt.putInt("y", successPlacePos.getY());
+                    successPlaceNbt.putInt("z", successPlacePos.getZ());
+                    be.deserializeNBT(successPlaceNbt);
+                }
             } else {
                 ItemEntity drop = new ItemEntity(level(), getX(), getY(), getZ(), displayItem.copy());
                 drop.setDefaultPickUpDelay();

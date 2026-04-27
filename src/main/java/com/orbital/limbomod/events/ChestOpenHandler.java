@@ -10,7 +10,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -35,13 +34,21 @@ public class ChestOpenHandler {
         BlockState state = serverLevel.getBlockState(pos);
 
         if (!(state.getBlock() instanceof ChestBlock)) return;
-
         if (!(serverLevel.getBlockEntity(pos) instanceof RandomizableContainerBlockEntity container)) return;
 
         CompoundTag nbt = container.serializeNBT();
         if (!nbt.contains("LootTable")) return;
 
         event.setCanceled(true);
+
+        CompoundTag savedNbt = nbt.copy();
+
+        // Strip loot table and any items so onRemove drops nothing
+        CompoundTag emptyNbt = nbt.copy();
+        emptyNbt.remove("LootTable");
+        emptyNbt.remove("LootTableSeed");
+        emptyNbt.remove("Items");
+        container.deserializeNBT(emptyNbt);
 
         serverLevel.removeBlock(pos, false);
 
@@ -59,7 +66,7 @@ public class ChestOpenHandler {
                 serverLevel, chestItem, seed,
                 pos.getX() + 0.5, pos.getY() + 1.5, pos.getZ() + 0.5, yaw);
 
-        display.setSuccessPlacement(pos, state);
+        display.setSuccessPlacement(pos, state, savedNbt);
         serverLevel.addFreshEntity(display);
 
         serverLevel.playSound(null, pos, LimboSounds.LIMBO_MUSIC.get(),
