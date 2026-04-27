@@ -3,6 +3,7 @@ package com.orbital.limbomod.entity;
 import com.orbital.limbomod.animation.AnimPhase;
 import com.orbital.limbomod.animation.ShuffleAnimator;
 import com.orbital.limbomod.animation.SlotState;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -15,6 +16,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.network.NetworkHooks;
 
 public class LimboDisplayEntity extends Entity {
@@ -35,6 +37,9 @@ public class LimboDisplayEntity extends Entity {
     private boolean          initialized   = false;
     private int              lifetimeTicks = 0;
 
+    private BlockPos   successPlacePos   = null;
+    private BlockState successPlaceState = null;
+
     public LimboDisplayEntity(EntityType<?> type, Level level) {
         super(type, level);
         this.noPhysics = true;
@@ -51,6 +56,11 @@ public class LimboDisplayEntity extends Entity {
         this.entityData.set(DATA_CLICKED_SLOT, -1);
         this.setPos(x, y, z);
         initAnimator(seed);
+    }
+
+    public void setSuccessPlacement(BlockPos pos, BlockState state) {
+        this.successPlacePos   = pos;
+        this.successPlaceState = state;
     }
 
     @Override
@@ -110,9 +120,13 @@ public class LimboDisplayEntity extends Entity {
         entityData.set(DATA_CLICKED_SLOT, slotIndex);
         animator.onSlotClicked(slotIndex);
         if (correct) {
-            ItemEntity drop = new ItemEntity(level(), getX(), getY(), getZ(), displayItem.copy());
-            drop.setDefaultPickUpDelay();
-            level().addFreshEntity(drop);
+            if (successPlacePos != null && successPlaceState != null) {
+                level().setBlock(successPlacePos, successPlaceState, 3);
+            } else {
+                ItemEntity drop = new ItemEntity(level(), getX(), getY(), getZ(), displayItem.copy());
+                drop.setDefaultPickUpDelay();
+                level().addFreshEntity(drop);
+            }
         } else {
             player.hurt(damageSources().generic(), 0.5f);
         }
