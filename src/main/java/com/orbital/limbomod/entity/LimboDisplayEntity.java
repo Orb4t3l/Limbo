@@ -126,15 +126,18 @@ public class LimboDisplayEntity extends Entity {
         boolean correct = (slotIndex == animator.getCorrectVisualSlot());
         entityData.set(DATA_CLICKED_SLOT, slotIndex);
         animator.onSlotClicked(slotIndex);
+
         if (correct) {
             if (successPlacePos != null && successPlaceState != null) {
                 level().setBlock(successPlacePos, successPlaceState, 3);
                 if (successPlaceNbt != null
                         && level().getBlockEntity(successPlacePos) instanceof RandomizableContainerBlockEntity be) {
-                    successPlaceNbt.putInt("x", successPlacePos.getX());
-                    successPlaceNbt.putInt("y", successPlacePos.getY());
-                    successPlaceNbt.putInt("z", successPlacePos.getZ());
-                    be.deserializeNBT(successPlaceNbt);
+                    CompoundTag restoreNbt = successPlaceNbt.copy();
+                    restoreNbt.putInt("x", successPlacePos.getX());
+                    restoreNbt.putInt("y", successPlacePos.getY());
+                    restoreNbt.putInt("z", successPlacePos.getZ());
+                    be.deserializeNBT(restoreNbt);
+                    be.unpackLootTable(player);
                 }
             } else {
                 ItemEntity drop = new ItemEntity(level(), getX(), getY(), getZ(), displayItem.copy());
