@@ -45,11 +45,8 @@ public class ChestOpenHandler {
 
         CompoundTag savedNbt = nbt.copy();
 
-        CompoundTag emptyNbt = nbt.copy();
-        emptyNbt.remove("LootTable");
-        emptyNbt.remove("LootTableSeed");
-        emptyNbt.remove("Items");
-        container.deserializeNBT(emptyNbt);
+        container.setLootTable(null, 0L);
+        container.clearContent();
 
         serverLevel.removeBlock(pos, false);
 
@@ -60,10 +57,13 @@ public class ChestOpenHandler {
         }
 
         BlockPos immutablePos = pos.immutable();
-        long seed = ThreadLocalRandom.current().nextLong();
+        long     seed         = ThreadLocalRandom.current().nextLong();
+
         LimboDisplayEntity display = new LimboDisplayEntity(
                 serverLevel, new ItemStack(Items.CHEST), seed,
-                immutablePos.getX() + 0.5, immutablePos.getY() + 1.5, immutablePos.getZ() + 0.5,
+                immutablePos.getX() + 0.5,
+                immutablePos.getY() + 1.5,
+                immutablePos.getZ() + 0.5,
                 player.getYRot());
 
         display.setSuccessPlacement(immutablePos, state, savedNbt);
