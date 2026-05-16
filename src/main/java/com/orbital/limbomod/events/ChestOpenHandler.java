@@ -11,7 +11,6 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.ChestBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -28,40 +27,21 @@ public class ChestOpenHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.getLevel().isClientSide()) return;
-
-        BlockPos   pos   = event.getPos();
-        BlockState state = event.getLevel().getBlockState(pos);
-
-        System.out.println("[ChestMod] RightClick on: " + state.getBlock().getDescriptionId());
-
-        if (!(state.getBlock() instanceof ChestBlock)) {
-            System.out.println("[ChestMod] Not a chest, skipping");
-            return;
-        }
-
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (player.isCreative()) return;
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
 
-        BlockEntity be = serverLevel.getBlockEntity(pos);
-        System.out.println("[ChestMod] BlockEntity: " + (be == null ? "NULL" : be.getClass().getSimpleName()));
+        BlockPos   pos   = event.getPos();
+        BlockState state = serverLevel.getBlockState(pos);
 
-        if (!(be instanceof RandomizableContainerBlockEntity container)) {
-            System.out.println("[ChestMod] Not a RandomizableContainerBlockEntity");
-            return;
-        }
+        if (!(state.getBlock() instanceof ChestBlock)) return;
+        if (!(serverLevel.getBlockEntity(pos) instanceof RandomizableContainerBlockEntity container)) return;
 
         CompoundTag nbt = container.serializeNBT();
-        System.out.println("[ChestMod] NBT keys: " + nbt.getAllKeys());
-        System.out.println("[ChestMod] Has LootTable: " + nbt.contains("LootTable"));
-
         if (!nbt.contains("LootTable")) return;
-
-        System.out.println("[ChestMod] Intercepting chest at " + pos);
 
         event.setCanceled(true);
         event.setUseBlock(Event.Result.DENY);
-
-        if (player.isCreative()) return;
 
         CompoundTag savedNbt = nbt.copy();
 
@@ -79,18 +59,17 @@ public class ChestOpenHandler {
             return;
         }
 
+        BlockPos immutablePos = pos.immutable();
         long seed = ThreadLocalRandom.current().nextLong();
         LimboDisplayEntity display = new LimboDisplayEntity(
                 serverLevel, new ItemStack(Items.CHEST), seed,
-                pos.getX() + 0.5, pos.getY() + 1.5, pos.getZ() + 0.5,
+                immutablePos.getX() + 0.5, immutablePos.getY() + 1.5, immutablePos.getZ() + 0.5,
                 player.getYRot());
 
-        display.setSuccessPlacement(pos, state, savedNbt);
+        display.setSuccessPlacement(immutablePos, state, savedNbt);
         serverLevel.addFreshEntity(display);
 
-        serverLevel.playSound(null, pos, LimboSounds.LIMBO_MUSIC.get(),
+        serverLevel.playSound(null, immutablePos, LimboSounds.LIMBO_MUSIC.get(),
                 SoundSource.RECORDS, 4.0f, 1.0f);
-
-        System.out.println("[ChestMod] Display spawned successfully");
     }
 }
