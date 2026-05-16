@@ -27,19 +27,9 @@ public class BlockBreakHandler {
     private static final int   MAX_DISPLAYS    = 10;
     private static final float DISPLAY_SPACING = 2.2f;
 
-    private static class PendingBreak {
-        final List<ItemStack> drops;
-        final float           playerYaw;
-        final double          centerX, centerY, centerZ;
-
-        PendingBreak(List<ItemStack> drops, float yaw, double cx, double cy, double cz) {
-            this.drops = drops; this.playerYaw = yaw;
-            this.centerX = cx; this.centerY = cy; this.centerZ = cz;
-        }
-    }
-
-    private final Map<String, PendingBreak> pendingBreaks    = new LinkedHashMap<>();
-    private final Set<String>               managedPositions = new HashSet<>();
+    private final Set<String>              managedPositions = new HashSet<>();
+    private final Map<String, Float>       positionYaw      = new HashMap<>();
+    private final Map<String, List<ItemStack>> pendingDrops = new LinkedHashMap<>();
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockEvent.BreakEvent event) {
@@ -47,7 +37,6 @@ public class BlockBreakHandler {
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
         Player player = event.getPlayer();
         if (player == null) return;
-
         if (player.isCreative()) return;
 
         BlockPos    pos   = event.getPos();
@@ -57,27 +46,30 @@ public class BlockBreakHandler {
 
         if (state.requiresCorrectToolForDrops() && !tool.isCorrectToolForDrops(state)) return;
 
-        List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, be, player, tool);
-        if (drops.isEmpty()) return;
+        List<ItemStack> preview = Block.getDrops(state, serverLevel, pos, be, player, tool);
+        if (preview.isEmpty()) return;
 
         String key = posKey(serverLevel, pos);
         managedPositions.add(key);
-        pendingBreaks.put(key, new PendingBreak(
-                drops,
-                player.getYRot(),
-                pos.getX() + 0.5,
-                pos.getY() + 1.5,
-                pos.getZ() + 0.5
-        ));
+        positionYaw.put(key, player.getYRot());
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;
         if (!(event.getEntity() instanceof ItemEntity itemEntity)) return;
-        BlockPos pos = BlockPos.containing(itemEntity.position());
-        if (managedPositions.contains(posKey(event.getLevel(), pos))) {
-            event.setCanceled(true);
+
+        Level    level = event.getLevel();
+        BlockPos pos   = BlockPos.containing(itemEntity.position());
+        String   key   = posKey(level, pos);
+
+        if (!managedPositions.contains(key)) return;
+
+        event.setCanceled(true);
+
+        ItemStack drop = itemEntity.getItem().copy();
+        if (!drop.isEmpty()) {
+            pendingDrops.computeIfAbsent(key, k -> new ArrayList<>()).add(drop);
         }
     }
 
@@ -87,41 +79,51 @@ public class BlockBreakHandler {
         if (event.level.isClientSide()) return;
         if (!(event.level instanceof ServerLevel serverLevel)) return;
 
-        for (PendingBreak pending : pendingBreaks.values()) {
-            spawnDisplays(serverLevel, pending);
+        for (Map.Entry<String, List<ItemStack>> entry : pendingDrops.entrySet()) {
+            List<ItemStack> drops = entry.getValue();
+            if (drops.isEmpty()) continue;
+
+            String key = entry.getKey();
+            String[] parts = key.split(":");
+            if (parts.length < 2) continue;
+            String[] coords = parts[1].split(",");
+            if (coords.length < 3) continue;
+
+            double cx, cy, cz;
+            try {
+                cx = Double.parseDouble(coords[0].trim()) + 0.5;
+                cy = Double.parseDouble(coords[1].trim()) + 1.5;
+                cz = Double.parseDouble(coords[2].trim()) + 0.5;
+            } catch (NumberFormatException e) {
+                continue;
+            }
+
+            float yaw = positionYaw.getOrDefault(key, 0f);
+
+            int existing = serverLevel.getEntities(LimboEntities.LIMBO_DISPLAY.get(), e -> true).size();
+            int canSpawn = Math.min(drops.size(), MAX_DISPLAYS - existing);
+            if (canSpawn <= 0) continue;
+
+            double yawRad = Math.toRadians(yaw);
+            double perpX  =  Math.cos(yawRad);
+            double perpZ  = -Math.sin(yawRad);
+
+            for (int i = 0; i < canSpawn; i++) {
+                double offset = (i - (drops.size() - 1) / 2.0) * DISPLAY_SPACING;
+                long   seed   = ThreadLocalRandom.current().nextLong();
+                LimboDisplayEntity display = new LimboDisplayEntity(
+                        serverLevel, drops.get(i), seed,
+                        cx + perpX * offset, cy, cz + perpZ * offset, yaw);
+                serverLevel.addFreshEntity(display);
+            }
+
+            serverLevel.playSound(null, BlockPos.containing(cx, cy, cz),
+                    LimboSounds.LIMBO_MUSIC.get(), SoundSource.RECORDS, 4.0f, 1.0f);
         }
 
-        pendingBreaks.clear();
+        pendingDrops.clear();
         managedPositions.clear();
-    }
-
-    private static void spawnDisplays(ServerLevel level, PendingBreak pending) {
-        int count    = pending.drops.size();
-        int existing = level.getEntities(LimboEntities.LIMBO_DISPLAY.get(), e -> true).size();
-        int canSpawn = Math.min(count, MAX_DISPLAYS - existing);
-        if (canSpawn <= 0) return;
-
-        double yawRad = Math.toRadians(pending.playerYaw);
-        double perpX  =  Math.cos(yawRad);
-        double perpZ  = -Math.sin(yawRad);
-
-        for (int i = 0; i < canSpawn; i++) {
-            ItemStack drop = pending.drops.get(i);
-            if (drop.isEmpty()) continue;
-
-            double offset = (i - (count - 1) / 2.0) * DISPLAY_SPACING;
-            double spawnX = pending.centerX + perpX * offset;
-            double spawnZ = pending.centerZ + perpZ * offset;
-
-            long seed = ThreadLocalRandom.current().nextLong();
-            LimboDisplayEntity display = new LimboDisplayEntity(
-                    level, drop, seed, spawnX, pending.centerY, spawnZ, pending.playerYaw);
-            level.addFreshEntity(display);
-        }
-
-        BlockPos pos = BlockPos.containing(pending.centerX, pending.centerY, pending.centerZ);
-        level.playSound(null, pos, LimboSounds.LIMBO_MUSIC.get(),
-                SoundSource.RECORDS, 4.0f, 1.0f);
+        positionYaw.clear();
     }
 
     private static String posKey(Level level, BlockPos pos) {
