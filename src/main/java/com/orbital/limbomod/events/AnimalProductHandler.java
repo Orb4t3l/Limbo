@@ -44,6 +44,7 @@ public class AnimalProductHandler {
                 && held.is(Items.BUCKET)) {
 
             event.setCanceled(true);
+            event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
 
             held.shrink(1);
             if (held.isEmpty()) player.setItemInHand(event.getHand(), ItemStack.EMPTY);
@@ -57,6 +58,7 @@ public class AnimalProductHandler {
                 && held.is(Items.SHEARS)) {
 
             event.setCanceled(true);
+            event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
 
             held.hurtAndBreak(1, player, p -> p.broadcastBreakEvent(event.getHand()));
             sheep.setSheared(true);
