@@ -37,6 +37,7 @@ public class LimboMod {
         MinecraftForge.EVENT_BUS.register(new FallingBlockHandler());
         MinecraftForge.EVENT_BUS.register(new ChestOpenHandler());
         MinecraftForge.EVENT_BUS.register(new ExplosionDropHandler());
+        MinecraftForge.EVENT_BUS.register(new AnimalProductHandler());
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             MinecraftForge.EVENT_BUS.register(new ClientClickHandler());
