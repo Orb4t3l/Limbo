@@ -186,4 +186,10 @@ public class LimboDisplayEntity extends Entity {
     @Override public boolean isPushable()   { return false; }
     @Override public boolean isPickable()   { return false; }
     @Override public boolean shouldRenderAtSqrDistance(double dist) { return dist < 4096; }
+
+
+    @Override
+    public boolean fireImmune() {
+        return true;
+    }
 }

@@ -12,6 +12,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.animal.Bucketable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -66,11 +67,11 @@ public class BucketHandler {
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
 
-        serverLevel.setBlock(fluidPos,
-                net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+        serverLevel.setBlock(fluidPos, Blocks.AIR.defaultBlockState(), 3);
 
         held.shrink(1);
         if (held.isEmpty()) player.setItemInHand(event.getHand(), ItemStack.EMPTY);
+        player.inventoryMenu.broadcastChanges();
 
         spawnDisplay(serverLevel, player, resultBucket);
     }
@@ -94,6 +95,7 @@ public class BucketHandler {
 
         held.shrink(1);
         if (held.isEmpty()) player.setItemInHand(event.getHand(), ItemStack.EMPTY);
+        player.inventoryMenu.broadcastChanges();
 
         spawnDisplay(serverLevel, player, resultBucket);
     }

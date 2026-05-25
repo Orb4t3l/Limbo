@@ -26,6 +26,7 @@ public class LimboEntities {
                             .<LimboDisplayEntity>of(LimboDisplayEntity::new, MobCategory.MISC)
                             .sized(4.0f, 2.0f)
                             .clientTrackingRange(64)
+                            .fireImmune()
                             .noSummon()
                             .build("limbo_display"));
 }
