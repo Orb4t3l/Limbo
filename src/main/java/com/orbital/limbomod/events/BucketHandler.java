@@ -12,6 +12,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.animal.Bucketable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
@@ -27,45 +28,44 @@ public class BucketHandler {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        if (event.getLevel().isClientSide()) return;
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (player.isCreative()) return;
-        if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
+        if (event.getEntity().isCreative()) return;
 
-        ItemStack held = player.getItemInHand(event.getHand());
+        ItemStack held = event.getEntity().getItemInHand(event.getHand());
         if (!held.is(Items.BUCKET)) return;
 
+        Level     level    = event.getLevel();
         BlockPos  pos      = event.getPos();
         Direction face     = event.getFace();
         BlockPos  adjacent = pos.relative(face);
 
-        FluidState fluidAtPos      = serverLevel.getFluidState(pos);
-        FluidState fluidAtAdjacent = serverLevel.getFluidState(adjacent);
+        FluidState fluidAtPos      = level.getFluidState(pos);
+        FluidState fluidAtAdjacent = level.getFluidState(adjacent);
 
         BlockPos   fluidPos   = null;
         FluidState fluidState = null;
 
-        if (fluidAtPos.isSource()) {
+        if (fluidAtPos.isSource() && isHandledFluid(fluidAtPos)) {
             fluidPos   = pos;
             fluidState = fluidAtPos;
-        } else if (fluidAtAdjacent.isSource()) {
+        } else if (fluidAtAdjacent.isSource() && isHandledFluid(fluidAtAdjacent)) {
             fluidPos   = adjacent;
             fluidState = fluidAtAdjacent;
         }
 
         if (fluidPos == null) return;
 
-        ItemStack resultBucket;
-        if (fluidState.is(Fluids.WATER)) {
-            resultBucket = new ItemStack(Items.WATER_BUCKET);
-        } else if (fluidState.is(Fluids.LAVA)) {
-            resultBucket = new ItemStack(Items.LAVA_BUCKET);
-        } else {
-            return;
-        }
-
+        // Cancel on BOTH sides so client prediction never runs
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
+
+        if (level.isClientSide()) return;
+
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!(level instanceof ServerLevel serverLevel)) return;
+
+        ItemStack resultBucket = fluidState.is(Fluids.WATER)
+                ? new ItemStack(Items.WATER_BUCKET)
+                : new ItemStack(Items.LAVA_BUCKET);
 
         serverLevel.setBlock(fluidPos, Blocks.AIR.defaultBlockState(), 3);
 
@@ -78,17 +78,21 @@ public class BucketHandler {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
-        if (event.getLevel().isClientSide()) return;
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (player.isCreative()) return;
-        if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
+        if (event.getEntity().isCreative()) return;
 
-        ItemStack held = player.getItemInHand(event.getHand());
+        ItemStack held = event.getEntity().getItemInHand(event.getHand());
         if (!held.is(Items.BUCKET) && !held.is(Items.WATER_BUCKET)) return;
-        if (!(event.getTarget() instanceof Bucketable bucketable)) return;
+        if (!(event.getTarget() instanceof Bucketable)) return;
 
+        // Cancel on both sides
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
+
+        if (event.getLevel().isClientSide()) return;
+
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
+        if (!(event.getTarget() instanceof Bucketable bucketable)) return;
 
         ItemStack resultBucket = bucketable.getBucketItemStack();
         event.getTarget().discard();
@@ -98,6 +102,10 @@ public class BucketHandler {
         player.inventoryMenu.broadcastChanges();
 
         spawnDisplay(serverLevel, player, resultBucket);
+    }
+
+    private static boolean isHandledFluid(FluidState state) {
+        return state.is(Fluids.WATER) || state.is(Fluids.LAVA);
     }
 
     private void spawnDisplay(ServerLevel level, ServerPlayer player, ItemStack item) {
