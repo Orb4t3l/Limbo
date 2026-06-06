@@ -71,7 +71,7 @@ public class BucketHandler {
 
         held.shrink(1);
         if (held.isEmpty()) player.setItemInHand(event.getHand(), ItemStack.EMPTY);
-        player.inventoryMenu.broadcastChanges();
+        player.inventoryMenu.broadcastFullState();
 
         spawnDisplay(serverLevel, player, resultBucket);
     }
@@ -99,7 +99,7 @@ public class BucketHandler {
 
         held.shrink(1);
         if (held.isEmpty()) player.setItemInHand(event.getHand(), ItemStack.EMPTY);
-        player.inventoryMenu.broadcastChanges();
+        player.inventoryMenu.broadcastFullState();
 
         spawnDisplay(serverLevel, player, resultBucket);
     }
