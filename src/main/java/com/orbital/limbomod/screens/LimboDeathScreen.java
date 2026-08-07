@@ -30,9 +30,12 @@ public class LimboDeathScreen extends DeathScreen {
     private Button   titleButton;
     private Button[] slotButtons;
 
-    private static final float SCALE = 100f;
-    private static final int   BTN_W = 60;
-    private static final int   BTN_H = 20;
+    private static final float SCALE  = 100f;
+    private static final int   BTN_W  = 60;
+    private static final int   BTN_H  = 20;
+    private static final int   MIN_W  = 20;
+    private static final int   MIN_H  = 8;
+    private static final int   Y_OFFSET = 40;
 
     public LimboDeathScreen(Component deathMessage, boolean hardcore) {
         super(deathMessage, hardcore);
@@ -71,6 +74,8 @@ public class LimboDeathScreen extends DeathScreen {
         if (animStarted) {
             respawnButton.visible = false;
             respawnButton.active  = false;
+            titleButton.visible   = false;
+            titleButton.active    = false;
         }
     }
 
@@ -78,27 +83,34 @@ public class LimboDeathScreen extends DeathScreen {
         animStarted = true;
         respawnButton.visible = false;
         respawnButton.active  = false;
+        titleButton.visible   = false;
+        titleButton.active    = false;
         animator = new ShuffleAnimator(new Random().nextLong());
     }
 
     @Override
     public void tick() {
+        if (finished) return;
+
         if (!musicStarted) {
             musicStarted = true;
             Minecraft.getInstance().getSoundManager().play(
                     SimpleSoundInstance.forUI(LimboSounds.LIMBO_MUSIC.get(), 1.0f));
         }
 
-        if (animator == null || finished) return;
+        if (animator == null) return;
 
         animator.tick();
 
         if (animator.isDone) {
             finished = true;
+            boolean correct = animator.resultIsCorrect;
+            animator = null;
+
             Minecraft mc = Minecraft.getInstance();
             mc.getSoundManager().stop(LimboSounds.LIMBO_MUSIC.get().getLocation(), SoundSource.MASTER);
 
-            if (animator.resultIsCorrect) {
+            if (correct) {
                 if (mc.getConnection() != null) {
                     mc.getConnection().send(new ServerboundClientCommandPacket(
                             ServerboundClientCommandPacket.Action.PERFORM_RESPAWN));
@@ -114,14 +126,10 @@ public class LimboDeathScreen extends DeathScreen {
     public void render(GuiGraphics g, int mx, int my, float pt) {
         super.render(g, mx, my, pt);
 
-        if (!animStarted || animator == null) return;
-
-        g.drawCenteredString(font,
-                Component.literal("Choose your respawn"),
-                width / 2, height / 4 + 60, 0xFFFFFFFF);
+        if (!animStarted || animator == null || finished) return;
 
         int    cx   = width  / 2;
-        int    cy   = height / 2 + 15;
+        int    cy   = height / 2 + Y_OFFSET;
         double rotR = Math.toRadians(-animator.groupRotation);
         float  cosR = (float) Math.cos(rotR);
         float  sinR = (float) Math.sin(rotR);
@@ -139,8 +147,8 @@ public class LimboDeathScreen extends DeathScreen {
             float sy = cy - ry * SCALE;
             float sc = slot.scale;
 
-            int w = Math.max(1, (int) (BTN_W * sc));
-            int h = Math.max(1, (int) (BTN_H * sc));
+            int w = Math.max(MIN_W, (int) (BTN_W * sc));
+            int h = Math.max(MIN_H, (int) (BTN_H * sc));
             int l = (int) (sx - w / 2f);
             int t = (int) (sy - h / 2f);
 
@@ -163,16 +171,18 @@ public class LimboDeathScreen extends DeathScreen {
             }
 
             if (btn.visible) {
-                btn.render(g, hovered ? l + w / 2 : -9999, hovered ? t + h / 2 : -9999, pt);
+                try {
+                    btn.render(g, hovered ? l + w / 2 : -9999, hovered ? t + h / 2 : -9999, pt);
+                } catch (ArithmeticException ignored) {}
             }
         }
     }
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
-        if (animator != null && animator.getPhase() == AnimPhase.WAITING) {
+        if (animator != null && !finished && animator.getPhase() == AnimPhase.WAITING) {
             int    cx   = width  / 2;
-            int    cy   = height / 2 + 15;
+            int    cy   = height / 2 + Y_OFFSET;
             double rotR = Math.toRadians(-animator.groupRotation);
             float  cosR = (float) Math.cos(rotR);
             float  sinR = (float) Math.sin(rotR);
@@ -183,8 +193,8 @@ public class LimboDeathScreen extends DeathScreen {
                 float ry = slot.x * sinR + slot.y * cosR;
                 float sx = cx + rx * SCALE;
                 float sy = cy - ry * SCALE;
-                int   w  = Math.max(1, (int) (BTN_W * slot.scale));
-                int   h  = Math.max(1, (int) (BTN_H * slot.scale));
+                int   w  = Math.max(MIN_W, (int) (BTN_W * slot.scale));
+                int   h  = Math.max(MIN_H, (int) (BTN_H * slot.scale));
                 int   l  = (int) (sx - w / 2f);
                 int   t  = (int) (sy - h / 2f);
 
