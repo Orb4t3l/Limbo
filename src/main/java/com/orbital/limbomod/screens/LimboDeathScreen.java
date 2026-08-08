@@ -86,18 +86,15 @@ public class LimboDeathScreen extends DeathScreen {
         titleButton.visible   = false;
         titleButton.active    = false;
         animator = new ShuffleAnimator(new Random().nextLong());
+
+        musicStarted = true;
+        Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(LimboSounds.LIMBO_MUSIC.get(), 1.0f));
     }
 
     @Override
     public void tick() {
         if (finished) return;
-
-        if (!musicStarted) {
-            musicStarted = true;
-            Minecraft.getInstance().getSoundManager().play(
-                    SimpleSoundInstance.forUI(LimboSounds.LIMBO_MUSIC.get(), 1.0f));
-        }
-
         if (animator == null) return;
 
         animator.tick();
