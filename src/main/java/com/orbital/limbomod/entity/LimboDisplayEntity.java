@@ -24,6 +24,10 @@ public class LimboDisplayEntity extends Entity {
 
     private static final int MAX_LIFETIME = 600;
 
+    private static final String LIMBO_EXEMPT_TAG = "LimboExempt";
+
+
+
     private static final EntityDataAccessor<ItemStack> DATA_ITEM =
             SynchedEntityData.defineId(LimboDisplayEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<Long> DATA_SEED =
@@ -124,8 +128,10 @@ public class LimboDisplayEntity extends Entity {
     public void onPlayerClickSlot(int slotIndex, Player player) {
         if (animator == null || animator.getPhase() != AnimPhase.WAITING) return;
         boolean correct = (slotIndex == animator.getCorrectVisualSlot());
+
         entityData.set(DATA_CLICKED_SLOT, slotIndex);
         animator.onSlotClicked(slotIndex);
+
 
         if (correct) {
             if (successPlacePos != null && successPlaceState != null) {
@@ -140,7 +146,7 @@ public class LimboDisplayEntity extends Entity {
                     be.unpackLootTable(player);
                 }
             } else {
-                ItemEntity drop = new ItemEntity(level(), getX(), getY(), getZ(), displayItem.copy());
+                ItemEntity drop = new ItemEntity(level(), getX(), getY(), getZ(), markExempt(displayItem.copy()));
                 drop.setDefaultPickUpDelay();
                 level().addFreshEntity(drop);
             }
@@ -191,5 +197,15 @@ public class LimboDisplayEntity extends Entity {
     @Override
     public boolean fireImmune() {
         return true;
+    }
+
+
+    public static ItemStack markExempt(ItemStack stack) {
+        stack.getOrCreateTag().putBoolean(LIMBO_EXEMPT_TAG, true);
+        return stack;
+    }
+
+    public static boolean isExempt(ItemStack stack) {
+        return stack.hasTag() && stack.getTag().getBoolean(LIMBO_EXEMPT_TAG);
     }
 }
