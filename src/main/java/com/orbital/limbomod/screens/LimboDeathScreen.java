@@ -89,7 +89,7 @@ public class LimboDeathScreen extends DeathScreen {
 
         musicStarted = true;
         Minecraft.getInstance().getSoundManager().play(
-                SimpleSoundInstance.forUI(LimboSounds.LIMBO_MUSIC.get(), 1.0f));
+                SimpleSoundInstance.forUI(LimboSounds.pickLimboMusic(), 1.0f));
     }
 
     @Override
@@ -106,6 +106,7 @@ public class LimboDeathScreen extends DeathScreen {
 
             Minecraft mc = Minecraft.getInstance();
             mc.getSoundManager().stop(LimboSounds.LIMBO_MUSIC.get().getLocation(), SoundSource.MASTER);
+            mc.getSoundManager().stop(LimboSounds.LIMBO_MUSIC_2.get().getLocation(), SoundSource.MASTER);
 
             if (correct) {
                 if (mc.getConnection() != null) {
@@ -207,6 +208,7 @@ public class LimboDeathScreen extends DeathScreen {
     private void goToTitle() {
         Minecraft mc = Minecraft.getInstance();
         mc.getSoundManager().stop(LimboSounds.LIMBO_MUSIC.get().getLocation(), SoundSource.MASTER);
+        mc.getSoundManager().stop(LimboSounds.LIMBO_MUSIC_2.get().getLocation(), SoundSource.MASTER);
         if (mc.level != null) mc.level.disconnect();
         mc.clearLevel();
         mc.setScreen(new TitleScreen());
