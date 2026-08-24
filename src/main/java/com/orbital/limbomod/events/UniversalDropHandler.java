@@ -43,6 +43,6 @@ public class UniversalDropHandler {
         serverLevel.addFreshEntity(display);
 
         serverLevel.playSound(null, BlockPos.containing(itemEntity.position()),
-                LimboSounds.LIMBO_MUSIC.get(), SoundSource.RECORDS, 4.0f, 1.0f);
+                LimboSounds.pickLimboMusic(), SoundSource.RECORDS, 4.0f, 1.0f);
     }
 }

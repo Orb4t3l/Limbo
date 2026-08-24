@@ -89,7 +89,7 @@ public class MobDropHandler {
         }
 
         serverLevel.playSound(null, event.getEntity().blockPosition(),
-                LimboSounds.LIMBO_MUSIC.get(), SoundSource.RECORDS, 4.0f, 1.0f);
+                LimboSounds.pickLimboMusic(), SoundSource.RECORDS, 4.0f, 1.0f);
         System.out.println("[LimboMod] Done.");
     }
 }

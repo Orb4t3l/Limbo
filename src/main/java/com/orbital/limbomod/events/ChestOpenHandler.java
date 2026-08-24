@@ -88,7 +88,7 @@ public class ChestOpenHandler {
             serverLevel.addFreshEntity(display);
         }
 
-        serverLevel.playSound(null, pos, LimboSounds.LIMBO_MUSIC.get(),
+        serverLevel.playSound(null, pos, LimboSounds.pickLimboMusic(),
                 SoundSource.RECORDS, 4.0f, 1.0f);
     }
 
@@ -136,7 +136,7 @@ public class ChestOpenHandler {
         display.setSuccessPlacement(immutablePos, state, savedNbt);
         serverLevel.addFreshEntity(display);
 
-        serverLevel.playSound(null, immutablePos, LimboSounds.LIMBO_MUSIC.get(),
+        serverLevel.playSound(null, immutablePos, LimboSounds.pickLimboMusic(),
                 SoundSource.RECORDS, 4.0f, 1.0f);
     }
 }

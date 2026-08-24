@@ -99,7 +99,7 @@ public class AnimalProductHandler {
         serverLevel.addFreshEntity(display);
 
         serverLevel.playSound(null, BlockPos.containing(itemEntity.position()),
-                LimboSounds.LIMBO_MUSIC.get(), SoundSource.RECORDS, 4.0f, 1.0f);
+                LimboSounds.pickLimboMusic(), SoundSource.RECORDS, 4.0f, 1.0f);
     }
 
     private void spawnDisplayNearPlayer(ServerLevel level, ServerPlayer player, ItemStack item) {
@@ -117,6 +117,6 @@ public class AnimalProductHandler {
         level.addFreshEntity(display);
 
         level.playSound(null, BlockPos.containing(spawnX, spawnY, spawnZ),
-                LimboSounds.LIMBO_MUSIC.get(), SoundSource.RECORDS, 4.0f, 1.0f);
+                LimboSounds.pickLimboMusic(), SoundSource.RECORDS, 4.0f, 1.0f);
     }
 }

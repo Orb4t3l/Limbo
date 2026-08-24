@@ -60,6 +60,6 @@ public class FishingHandler {
         }
 
         serverLevel.playSound(null, player.blockPosition(),
-                LimboSounds.LIMBO_MUSIC.get(), SoundSource.RECORDS, 4.0f, 1.0f);
+                LimboSounds.pickLimboMusic(), SoundSource.RECORDS, 4.0f, 1.0f);
     }
 }
