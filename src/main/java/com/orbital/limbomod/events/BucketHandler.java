@@ -1,5 +1,6 @@
 package com.orbital.limbomod.events;
 
+import com.orbital.limbomod.LimboDifficulty;
 import com.orbital.limbomod.LimboSounds;
 import com.orbital.limbomod.entity.LimboDisplayEntity;
 import com.orbital.limbomod.entity.LimboEntities;
@@ -31,6 +32,7 @@ public class BucketHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.getEntity().isCreative()) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.BUCKETS)) return;
 
         ItemStack held = event.getEntity().getItemInHand(event.getHand());
         if (!held.is(Items.BUCKET)) return;
@@ -70,6 +72,7 @@ public class BucketHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         if (event.getEntity().isCreative()) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.BUCKETS)) return;
 
         ItemStack held = event.getEntity().getItemInHand(event.getHand());
         if (!held.is(Items.BUCKET)) return;
@@ -98,6 +101,7 @@ public class BucketHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.getEntity().isCreative()) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.BUCKETS)) return;
 
         ItemStack held = event.getEntity().getItemInHand(event.getHand());
         if (!held.is(Items.BUCKET) && !held.is(Items.WATER_BUCKET)) return;

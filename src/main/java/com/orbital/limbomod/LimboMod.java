@@ -47,7 +47,10 @@ public class LimboMod {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
-        event.enqueueWork(LimboNetwork::register);
+        event.enqueueWork(() -> {
+            LimboNetwork.register();
+            LimboDifficulty.load();
+        });
     }
 
     private void clientSetup(FMLClientSetupEvent event) {
@@ -55,5 +58,9 @@ public class LimboMod {
                 EntityRenderers.register(
                         LimboEntities.LIMBO_DISPLAY.get(),
                         LimboDisplayRenderer::new));
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            MinecraftForge.EVENT_BUS.register(new ClientClickHandler());
+            MinecraftForge.EVENT_BUS.register(new TitleScreenHandler());
+        }
     }
 }

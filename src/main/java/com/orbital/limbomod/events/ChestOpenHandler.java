@@ -1,5 +1,6 @@
 package com.orbital.limbomod.events;
 
+import com.orbital.limbomod.LimboDifficulty;
 import com.orbital.limbomod.LimboSounds;
 import com.orbital.limbomod.entity.LimboDisplayEntity;
 import com.orbital.limbomod.entity.LimboEntities;
@@ -34,6 +35,7 @@ public class ChestOpenHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onChestBreak(BlockEvent.BreakEvent event) {
         if (event.getLevel().isClientSide()) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.CHESTS)) return;
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
         Player player = event.getPlayer();
         if (player == null || player.isCreative()) return;
@@ -93,6 +95,7 @@ public class ChestOpenHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.getLevel().isClientSide()) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.CHESTS)) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (player.isCreative()) return;
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;

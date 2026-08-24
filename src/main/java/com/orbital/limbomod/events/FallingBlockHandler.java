@@ -1,5 +1,6 @@
 package com.orbital.limbomod.events;
 
+import com.orbital.limbomod.LimboDifficulty;
 import com.orbital.limbomod.LimboSounds;
 import com.orbital.limbomod.entity.LimboDisplayEntity;
 import com.orbital.limbomod.entity.LimboEntities;
@@ -37,6 +38,7 @@ public class FallingBlockHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.FALLING_BLOCKS)) return;
         if (!(event.getEntity() instanceof ItemEntity itemEntity)) return;
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
 

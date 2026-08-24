@@ -1,5 +1,6 @@
 package com.orbital.limbomod.events;
 
+import com.orbital.limbomod.LimboDifficulty;
 import com.orbital.limbomod.network.LimboNetwork;
 import com.orbital.limbomod.network.SelectItemPacket;
 import com.orbital.limbomod.renderer.ClientHoverState;
@@ -29,6 +30,7 @@ public class ClientClickHandler {
 
     @SubscribeEvent
     public void onScreenOpening(ScreenEvent.Opening event) {
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.DEATH_RESPAWN)) return;
         if (event.getScreen() instanceof DeathScreen death && !(death instanceof LimboDeathScreen)) {
             event.setNewScreen(new LimboDeathScreen(
                     death.getTitle(),

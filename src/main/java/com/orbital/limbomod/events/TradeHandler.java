@@ -1,5 +1,6 @@
 package com.orbital.limbomod.events;
 
+import com.orbital.limbomod.LimboDifficulty;
 import com.orbital.limbomod.LimboSounds;
 import com.orbital.limbomod.entity.LimboDisplayEntity;
 import com.orbital.limbomod.entity.LimboEntities;
@@ -27,6 +28,7 @@ public class TradeHandler {
     @SubscribeEvent
     public void onContainerOpen(PlayerContainerEvent.Open event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.TRADING)) return;
         if (!(event.getContainer() instanceof MerchantMenu menu)) return;
         TradeListener listener = new TradeListener(player, this);
         menu.addSlotListener(listener);

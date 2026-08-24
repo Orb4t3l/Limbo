@@ -1,5 +1,6 @@
 package com.orbital.limbomod.events;
 
+import com.orbital.limbomod.LimboDifficulty;
 import com.orbital.limbomod.LimboSounds;
 import com.orbital.limbomod.entity.LimboDisplayEntity;
 import com.orbital.limbomod.entity.LimboEntities;
@@ -47,6 +48,7 @@ public class BlockBreakHandler {
         Player player = event.getPlayer();
         if (player == null) return;
         if (player.isCreative()) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.BLOCK_DROPS)) return;
 
         BlockPos    pos   = event.getPos();
         BlockState  state = serverLevel.getBlockState(pos);

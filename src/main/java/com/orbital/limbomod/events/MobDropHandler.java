@@ -1,5 +1,6 @@
 package com.orbital.limbomod.events;
 
+import com.orbital.limbomod.LimboDifficulty;
 import com.orbital.limbomod.LimboSounds;
 import com.orbital.limbomod.entity.LimboDisplayEntity;
 import com.orbital.limbomod.entity.LimboEntities;
@@ -22,7 +23,7 @@ public class MobDropHandler {
     @SubscribeEvent
     public void onMobDrops(LivingDropsEvent event) {
         System.out.println("[LimboMod] onMobDrops fired for: " + event.getEntity().getType().toShortString());
-
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.MOB_DROPS)) return;
         if (event.getEntity().level().isClientSide()) {
             System.out.println("[LimboMod] Skipping — client side");
             return;

@@ -1,5 +1,6 @@
 package com.orbital.limbomod.events;
 
+import com.orbital.limbomod.LimboDifficulty;
 import com.orbital.limbomod.LimboSounds;
 import com.orbital.limbomod.entity.LimboDisplayEntity;
 import com.orbital.limbomod.entity.LimboEntities;
@@ -36,6 +37,7 @@ public class ExplosionDropHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onExplosionDetonate(ExplosionEvent.Detonate event) {
         if (event.getLevel().isClientSide()) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.EXPLOSIONS)) return;
         if (event.getAffectedBlocks().isEmpty()) return;
 
         String dim = event.getLevel().dimension().location().toString();

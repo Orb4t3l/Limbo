@@ -1,5 +1,6 @@
 package com.orbital.limbomod.events;
 
+import com.orbital.limbomod.LimboDifficulty;
 import com.orbital.limbomod.LimboSounds;
 import com.orbital.limbomod.entity.LimboDisplayEntity;
 import com.orbital.limbomod.entity.LimboEntities;
@@ -21,6 +22,7 @@ public class UniversalDropHandler {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.isCanceled()) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.UNIVERSAL_CATCHALL)) return;
         if (event.getLevel().isClientSide()) return;
         if (!(event.getEntity() instanceof ItemEntity itemEntity)) return;
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;

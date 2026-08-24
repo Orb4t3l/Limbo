@@ -1,5 +1,6 @@
 package com.orbital.limbomod.events;
 
+import com.orbital.limbomod.LimboDifficulty;
 import com.orbital.limbomod.LimboSounds;
 import com.orbital.limbomod.entity.LimboDisplayEntity;
 import com.orbital.limbomod.entity.LimboEntities;
@@ -21,6 +22,7 @@ public class CraftingHandler {
     @SubscribeEvent
     public void onItemCrafted(PlayerEvent.ItemCraftedEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!LimboDifficulty.isEnabled(LimboDifficulty.Feature.CRAFTING)) return;
         if (player.isCreative()) return;
         if (!(player.level() instanceof ServerLevel serverLevel)) return;
 
